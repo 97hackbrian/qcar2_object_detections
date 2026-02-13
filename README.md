@@ -7,6 +7,10 @@ python3 rqt_fixer.py
 ros2 run rqt_image_view rqt_image_view
 
 # 3. Ejeutar YoloV8
+cp /workspaces/isaac_ros-dev/yolov8s.onnx /tmp/yolov8s.onnx
+
+source /workspaces/isaac_ros-dev/ros2/install/setup.bash
+
 ros2 launch isaac_ros_yolov8 isaac_ros_yolov8_visualize.launch.py \
   model_file_path:=/tmp/yolov8s.onnx \
   engine_file_path:=/tmp/yolov8s.plan \
