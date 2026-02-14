@@ -6,7 +6,7 @@ python3 rqt_fixer.py
 # 2. Visualización de la cámara en RQT
 ros2 run rqt_image_view rqt_image_view
 
-# 3. Ejeutar YoloV8
+# 3. Ejecutar YoloV8
 1. cp /workspaces/isaac_ros-dev/yolov8s.onnx /tmp/yolov8s.onnx
 
 2. source /workspaces/isaac_ros-dev/ros2/install/setup.bash
