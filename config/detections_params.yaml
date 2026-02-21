@@ -1,51 +1,41 @@
 # =============================================================================
 # QCar2 Object Detections - Configuration Parameters
 # =============================================================================
-# This file contains all configurable parameters for the detection nodes.
-# Load with: ros2 launch qcar2_object_detections qcar2_detections.launch.py
-#            --params-file /path/to/detections_params.yaml
+# Load with:
+#   ros2 launch qcar2_object_detections qcar2_detections.launch.py
+#     --params-file /path/to/detections_params.yaml
 # =============================================================================
 
 # =============================================================================
 # Image Preprocessor Node
 # =============================================================================
-# Resizes input images with letterbox padding for YoloV8 compatibility
-
 image_preprocessor_node:
   ros__parameters:
-    # Input/Output Topics
     input_image_topic: "/camera/color_image"
     output_image_topic: "/image"
-    
-    # Input image dimensions (before resize)
+
     input_width: 640
     input_height: 480
-    
-    # Target dimensions (for YoloV8)
+
     target_width: 640
     target_height: 640
-    
-    # Padding color (RGB)
+
     padding_color: [0, 0, 0]
-    
-    # Input encoding
     input_encoding: "bgr8"
 
 
 # =============================================================================
 # Detection Filter Node
 # =============================================================================
-# Filters YoloV8 detections by ROI and publishes specialized messages
-
 detection_filter_node:
   ros__parameters:
     # -------------------------------------------------------------------------
     # Input Topics
     # -------------------------------------------------------------------------
-    image_topic: "/image"                    # Main image for analysis
-    detections_input_topic: "/detections_output"  # YoloV8 detections
-    zebra_image_topic: "/camera/csi_image_3"      # Zebra crossing camera
-    
+    image_topic: "/image"
+    detections_input_topic: "/detections_output"
+    zebra_image_topic: "/camera/csi_image_3"
+
     # -------------------------------------------------------------------------
     # Output Topics
     # -------------------------------------------------------------------------
@@ -53,80 +43,85 @@ detection_filter_node:
     traffic_light_output_topic: "/detections/traffic_light"
     stop_sign_output_topic: "/detections/stop_sign"
     zebra_output_topic: "/detections/zebra_crossing"
-    
+
     # -------------------------------------------------------------------------
     # COCO Class IDs
     # -------------------------------------------------------------------------
-    # Reference: https://docs.ultralytics.com/datasets/detect/coco/
-    person_class_id: "0"          # person
-    traffic_light_class_id: "9"   # traffic light
-    stop_sign_class_id: "11"      # stop sign
-    
+    person_class_id: "0"
+    traffic_light_class_id: "9"
+    stop_sign_class_id: "11"
+
     # -------------------------------------------------------------------------
-    # ROI Configuration [x1, y1, x2, y2]
+    # ROIs (pixeles)
     # -------------------------------------------------------------------------
-    # Detections outside ROI will be ignored
-    # Coordinates are in pixels relative to the input image
-    
     person_roi: [0, 0, 640, 640]
-    traffic_light_roi: [100, 250, 520, 250]
     stop_sign_roi: [0, 0, 640, 640]
-    
+
     # -------------------------------------------------------------------------
     # Confidence Threshold
     # -------------------------------------------------------------------------
-    min_confidence: 0.5
-    
+    # ESTE (min_confidence) es el que tu detection_filter_node.py USA seguro.
+    min_confidence: 0.70
+
+    # Este (confidence_threshold) SOLO servirá si el nodo YOLO/TensorRT lee este
+    # parámetro desde el mismo YAML (normalmente se pasa como launch arg).
+    confidence_threshold: 0.70
+
+
+
+
+
+    # -------------------------------------------------------------------------
+    # PERSON
+    # -------------------------------------------------------------------------
+    person_roi_x_min: 0.45     # ROI vertical angosto al centro (en % del ancho)
+    person_roi_x_max: 0.55
+    person_roi_y_min: 0.35     # parte media-baja (en % del alto)
+    person_roi_y_max: 0.98
+
+    person_min_bbox_area: 1200  # ajusta: más alto = más cerca
+    person_confirm_frames: 3    # estabilidad (igual que semáforo)
+    person_debug_view: true
+    person_window_name: "person_debug"
+
+
+
+
+
+
     # -------------------------------------------------------------------------
     # Zebra Crossing Detection Parameters
     # -------------------------------------------------------------------------
     zebra_enabled: true
-    
-    # ROI as percentage of image dimensions
-    zebra_roi_top: 0.80       # Start at 80% from top
-    zebra_roi_bottom: 0.985   # End at 98.5% from top
-    zebra_roi_width: 0.40     # Width = 40% of image, centered
-    
-    # Stripe count thresholds
-    zebra_min_stripes: 4      # Minimum stripes to detect
-    zebra_max_stripes: 7      # Maximum stripes to detect
-    
-    # Voting for stability (reduces false positives)
-    zebra_vote_threshold: 5   # Votes needed to confirm detection
-    zebra_vote_window: 7      # Window size for voting
-    
+    zebra_roi_top: 0.74
+    zebra_roi_bottom: 0.955
+    zebra_roi_width: 0.40
+    zebra_min_stripes: 4
+    zebra_max_stripes: 7
+    zebra_vote_threshold: 5
+    zebra_vote_window: 7
+
+    # -------------------------------------------------------------------------
+    # Traffic Light (IMPROVED)
+    # -------------------------------------------------------------------------
+    traffic_light_roi_x_min: 0.25
+    traffic_light_roi_x_max: 0.65
+    traffic_light_roi_y_min: 0.30
+    traffic_light_roi_y_max: 0.60
+
+    traffic_light_min_bbox_area: 600
+    traffic_light_confirm_frames: 3
+    traffic_light_debug_view: true
+    traffic_light_sensitivity: 4 # mejroa la direfencia entre verde y amarillo
+
     # -------------------------------------------------------------------------
     # Traffic Light HSV Color Thresholds
     # -------------------------------------------------------------------------
-    # Format: [H, S, V] - OpenCV uses H: 0-179, S: 0-255, V: 0-255
-    
     traffic_light_red_lower: [0, 160, 160]
     traffic_light_red_upper: [10, 255, 255]
-    
+
     traffic_light_yellow_lower: [20, 30, 240]
     traffic_light_yellow_upper: [45, 160, 255]
-    
+
     traffic_light_green_lower: [46, 140, 140]
     traffic_light_green_upper: [90, 255, 255]
-    
-    # Minimum pixels to consider a color detected
-    traffic_light_sensitivity: 8
-
-
-# =============================================================================
-# YoloV8 TensorRT Parameters (Launch Arguments)
-# =============================================================================
-# These are typically passed via launch arguments, but documented here for reference
-
-# yolov8_config:
-#   model_file_path: "/tmp/yolov8s.onnx"
-#   engine_file_path: "/tmp/yolov8s.plan"
-#   input_binding_names: "['images']"
-#   output_binding_names: "['output0']"
-#   network_image_width: 640
-#   network_image_height: 640
-#   force_engine_update: false
-#   image_mean: [0.0, 0.0, 0.0]
-#   image_stddev: [1.0, 1.0, 1.0]
-#   confidence_threshold: 0.75
-#   nms_threshold: 0.45
