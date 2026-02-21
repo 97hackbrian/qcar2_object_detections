@@ -69,7 +69,7 @@ detection_filter_node:
     # Coordinates are in pixels relative to the input image
     
     person_roi: [0, 0, 640, 640]
-    traffic_light_roi: [0, 0, 640, 640]
+    traffic_light_roi: [100, 250, 520, 250]
     stop_sign_roi: [0, 0, 640, 640]
     
     # -------------------------------------------------------------------------

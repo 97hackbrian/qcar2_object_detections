@@ -10,6 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(rclpy REQUIRED)
 
 # Generate messages
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -20,8 +21,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   DEPENDENCIES std_msgs
 )
 
-# Install Python modules
-ament_python_install_package(${PROJECT_NAME})
+# Export dependencies for downstream packages
+ament_export_dependencies(rosidl_default_runtime)
 
 # Install Python executables
 install(PROGRAMS

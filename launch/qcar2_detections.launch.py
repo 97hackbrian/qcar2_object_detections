@@ -28,8 +28,7 @@ from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
-from launch_ros.actions import Node, ComposableNodeContainer
-from launch_ros.descriptions import ComposableNode
+from launch_ros.actions import Node
 
 
 def generate_launch_description():
@@ -109,6 +108,16 @@ def generate_launch_description():
             'network_image_height',
             default_value='640',
             description='Network input height'
+        ),
+        DeclareLaunchArgument(
+            'input_image_width',
+            default_value='640',
+            description='Input image width for encoder'
+        ),
+        DeclareLaunchArgument(
+            'input_image_height',
+            default_value='640',
+            description='Input image height for encoder'
         ),
         DeclareLaunchArgument(
             'force_engine_update',
@@ -215,6 +224,8 @@ def generate_launch_description():
     output_binding_names = LaunchConfiguration('output_binding_names')
     network_image_width = LaunchConfiguration('network_image_width')
     network_image_height = LaunchConfiguration('network_image_height')
+    input_image_width = LaunchConfiguration('input_image_width')
+    input_image_height = LaunchConfiguration('input_image_height')
     force_engine_update = LaunchConfiguration('force_engine_update')
     image_mean = LaunchConfiguration('image_mean')
     image_stddev = LaunchConfiguration('image_stddev')
@@ -255,63 +266,30 @@ def generate_launch_description():
         }]
     )
     
-    # YoloV8 TensorRT Container (Composable Nodes)
-    encoder_node = ComposableNode(
-        name='dnn_image_encoder',
-        package='isaac_ros_dnn_image_encoder',
-        plugin='nvidia::isaac_ros::dnn_inference::DnnImageEncoderNode',
-        remappings=[
-            ('image', preprocessed_image_topic),
-            ('encoded_tensor', 'tensor_pub')
-        ],
-        parameters=[{
-            'input_image_width': network_image_width,
-            'input_image_height': network_image_height,
-            'network_image_width': network_image_width,
-            'network_image_height': network_image_height,
-            'image_mean': image_mean,
-            'image_stddev': image_stddev,
-        }]
-    )
-    
-    tensor_rt_node = ComposableNode(
-        name='tensor_rt',
-        package='isaac_ros_tensor_rt',
-        plugin='nvidia::isaac_ros::dnn_inference::TensorRTNode',
-        parameters=[{
+    # YoloV8 TensorRT Launch (Isaac ROS)
+    yolov8_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            get_package_share_directory('isaac_ros_yolov8'),
+            '/launch/isaac_ros_yolov8_visualize.launch.py'
+        ]),
+        launch_arguments={
             'model_file_path': model_file_path,
             'engine_file_path': engine_file_path,
-            'output_binding_names': output_binding_names,
-            'output_tensor_names': ['output_tensor'],
-            'input_tensor_names': ['input_tensor'],
             'input_binding_names': input_binding_names,
-            'verbose': False,
+            'output_binding_names': output_binding_names,
+            'network_image_width': network_image_width,
+            'network_image_height': network_image_height,
+            'input_image_width': input_image_width,
+            'input_image_height': input_image_height,
+            'image_name': preprocessed_image_topic,
             'force_engine_update': force_engine_update,
-        }]
-    )
-    
-    yolov8_decoder_node = ComposableNode(
-        name='yolov8_decoder_node',
-        package='isaac_ros_yolov8',
-        plugin='nvidia::isaac_ros::yolov8::YoloV8DecoderNode',
-        parameters=[{
+            'image_mean': image_mean,
+            'image_stddev': image_stddev,
             'confidence_threshold': confidence_threshold,
             'nms_threshold': nms_threshold,
-        }]
-    )
-    
-    tensor_rt_container = ComposableNodeContainer(
-        name='tensor_rt_container',
-        package='rclcpp_components',
-        executable='component_container_mt',
-        composable_node_descriptions=[
-            encoder_node,
-            tensor_rt_node,
-            yolov8_decoder_node
-        ],
-        output='screen',
-        arguments=['--ros-args', '--log-level', 'INFO'],
-        namespace=''
+            'bounding_box_scale': '1.0',
+            'setup_image_viewer': 'False',
+        }.items()
     )
     
     # Detection Filter Node
@@ -353,7 +331,7 @@ def generate_launch_description():
     return LaunchDescription(
         launch_args + [
             image_preprocessor_node,
-            tensor_rt_container,
+            yolov8_launch,
             detection_filter_node,
         ]
     )

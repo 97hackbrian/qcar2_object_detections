@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import sys
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
@@ -10,13 +11,19 @@ import numpy as np
 from collections import deque
 import threading
 
-# Custom messages
-from qcar2_object_detections.msg import (
-    PersonDetection,
-    TrafficLightDetection,
-    StopSignDetection,
-    ZebraCrossingDetection
-)
+# Custom messages - import with error handling
+try:
+    from qcar2_object_detections.msg import (
+        PersonDetection,
+        TrafficLightDetection,
+        StopSignDetection,
+        ZebraCrossingDetection
+    )
+except ImportError as e:
+    print(f"ERROR: Failed to import custom messages: {e}", file=sys.stderr)
+    print("Make sure to build the package first: colcon build --packages-select qcar2_object_detections", file=sys.stderr)
+    print("Then source the workspace: source install/setup.bash", file=sys.stderr)
+    sys.exit(1)
 
 
 class DetectionFilterNode(Node):
@@ -377,8 +384,133 @@ class DetectionFilterNode(Node):
         cv2.waitKey(1)
 
     # ============================================================
-    # (ZEBRA Y PERSON/STOP SIGUEN IGUAL EN TU PROYECTO)
+    # PERSON PUBLISHER
     # ============================================================
+    def _publish_person(self, detection_data, header):
+        msg = PersonDetection()
+        msg.header = header
+
+        if detection_data is not None:
+            det, score = detection_data
+            msg.detected = True
+            msg.confidence = float(score)
+        else:
+            msg.detected = False
+            msg.confidence = 0.0
+
+        self.person_pub.publish(msg)
+
+    # ============================================================
+    # STOP SIGN PUBLISHER
+    # ============================================================
+    def _publish_stop_sign(self, detection_data, header):
+        msg = StopSignDetection()
+        msg.header = header
+
+        if detection_data is not None:
+            det, score = detection_data
+            msg.detected = True
+            msg.confidence = float(score)
+        else:
+            msg.detected = False
+            msg.confidence = 0.0
+
+        self.stop_sign_pub.publish(msg)
+
+    # ============================================================
+    # ZEBRA CROSSING DETECTION LOOP
+    # ============================================================
+    def _zebra_loop(self):
+        import cv2
+        import time
+
+        rate = 10  # Hz
+        period = 1.0 / rate
+
+        while rclpy.ok():
+            start_time = time.time()
+
+            with self.lock:
+                if self.zebra_image is not None:
+                    frame = self.zebra_image.copy()
+                else:
+                    frame = None
+
+            if frame is not None:
+                detected, stripe_count = self._detect_zebra_crossing(frame)
+                self.zebra_votes.append(1 if detected else 0)
+
+                vote_count = sum(self.zebra_votes)
+                is_zebra = vote_count >= self.zebra_vote_threshold
+
+                # Only publish on state change
+                if is_zebra != self.last_zebra_state:
+                    self.last_zebra_state = is_zebra
+                    self._publish_zebra(is_zebra, stripe_count if is_zebra else 0)
+
+            elapsed = time.time() - start_time
+            sleep_time = period - elapsed
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+
+    def _detect_zebra_crossing(self, frame):
+        import cv2
+
+        try:
+            h, w = frame.shape[:2]
+
+            # Calculate ROI
+            roi_top = int(h * self.zebra_roi_top)
+            roi_bottom = int(h * self.zebra_roi_bottom)
+            roi_width = int(w * self.zebra_roi_width)
+            roi_left = (w - roi_width) // 2
+            roi_right = roi_left + roi_width
+
+            roi = frame[roi_top:roi_bottom, roi_left:roi_right]
+
+            if roi.size == 0:
+                return False, 0
+
+            # Convert to grayscale
+            gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+
+            # Apply adaptive threshold
+            binary = cv2.adaptiveThreshold(
+                gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                cv2.THRESH_BINARY, 11, 2
+            )
+
+            # Find horizontal stripes using morphological operations
+            kernel_h = cv2.getStructuringElement(cv2.MORPH_RECT, (roi_width // 2, 3))
+            horizontal = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel_h)
+
+            # Count stripes
+            contours, _ = cv2.findContours(
+                horizontal, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+            )
+
+            # Filter contours by width
+            min_stripe_width = roi_width * 0.3
+            valid_stripes = 0
+
+            for cnt in contours:
+                x, y, cw, ch = cv2.boundingRect(cnt)
+                if cw >= min_stripe_width:
+                    valid_stripes += 1
+
+            detected = self.zebra_min_stripes <= valid_stripes <= self.zebra_max_stripes
+            return detected, valid_stripes
+
+        except Exception as e:
+            self.get_logger().error(f'Zebra detection error: {e}')
+            return False, 0
+
+    def _publish_zebra(self, detected: bool, stripe_count: int = 0):
+        msg = ZebraCrossingDetection()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.detected = detected
+        msg.stripe_count = stripe_count
+        self.zebra_pub.publish(msg)
 
 
 def main(args=None):
