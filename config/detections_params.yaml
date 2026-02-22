@@ -81,7 +81,7 @@ detection_filter_node:
 
     person_min_bbox_area: 1200  # ajusta: más alto = más cerca
     person_confirm_frames: 3    # estabilidad (igual que semáforo)
-    person_debug_view: true
+    person_debug_view: false
     person_window_name: "person_debug"
 
 
@@ -111,7 +111,7 @@ detection_filter_node:
 
     traffic_light_min_bbox_area: 600
     traffic_light_confirm_frames: 3
-    traffic_light_debug_view: true
+    traffic_light_debug_view: false
     traffic_light_sensitivity: 4 # mejroa la direfencia entre verde y amarillo
 
     # -------------------------------------------------------------------------

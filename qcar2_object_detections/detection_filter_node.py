@@ -62,16 +62,16 @@ class DetectionFilterNode(Node):
         # =====================================================================
         # 2) STOP SIGN ROI (EN % - DERECHA CENTRO) + CERCA + DEBUG
         # =====================================================================
-        self.declare_parameter('stop_sign_roi_x_min', 0.62)
-        self.declare_parameter('stop_sign_roi_x_max', 0.98)
+        self.declare_parameter('stop_sign_roi_x_min', 0.95)
+        self.declare_parameter('stop_sign_roi_x_max', 1.0)
 
-        self.declare_parameter('stop_sign_roi_y_min', 0.35)
-        self.declare_parameter('stop_sign_roi_y_max', 0.65)
+        self.declare_parameter('stop_sign_roi_y_min', 0.25)
+        self.declare_parameter('stop_sign_roi_y_max', 0.45)
 
         # Cerca del auto
         self.declare_parameter('stop_sign_min_bbox_area', 2400) #2500
 
-        self.declare_parameter('stop_sign_debug_view', True)
+        self.declare_parameter('stop_sign_debug_view', False)
         self.declare_parameter('stop_sign_window_name', 'stop_debug')
 
         # =====================================================================
@@ -86,7 +86,7 @@ class DetectionFilterNode(Node):
         self.declare_parameter('zebra_vote_threshold', 5)
         self.declare_parameter('zebra_vote_window', 7)
 
-        self.declare_parameter('zebra_debug_view', True)
+        self.declare_parameter('zebra_debug_view', False)
         self.declare_parameter('zebra_window_name', "zebra_debug")
 
         # =====================================================================
@@ -123,7 +123,7 @@ class DetectionFilterNode(Node):
         self.declare_parameter('person_confirm_frames_on', 4)
         self.declare_parameter('person_confirm_frames_off', 8)
 
-        self.declare_parameter('person_debug_view', True)
+        self.declare_parameter('person_debug_view', False)
         self.declare_parameter('person_window_name', "person_debug")
 
         # =====================================================================

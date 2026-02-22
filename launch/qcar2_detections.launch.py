@@ -136,7 +136,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'confidence_threshold',
-            default_value='0.75',
+            default_value='0.55',
             description='YoloV8 confidence threshold'
         ),
         DeclareLaunchArgument(
