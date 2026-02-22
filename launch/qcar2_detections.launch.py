@@ -149,7 +149,7 @@ def generate_launch_description():
         name='detection_filter_node',
         output='screen',
         parameters=[
-            params_file,  # ✅ carga TODO del YAML primero
+            params_file,  #  carga TODO del YAML primero
             {
                 # override mínimos / wiring
                 'image_topic': preprocessed_image_topic,
@@ -168,6 +168,7 @@ def generate_launch_description():
 
 
                 #  -------------- VISUALIZACION ------------
+                # elegir with true or false
                 'person_debug_view': True,
                 'stop_sign_debug_view': False,
                 'zebra_debug_view': False,

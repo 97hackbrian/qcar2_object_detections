@@ -3,7 +3,8 @@
 
 
 
-# --------------- DETECCION CUANDO EL OBJETO ESTA CERCA -------------
+
+# --------------- DETECCION CUANDO EL OBJETO ESTA CERCA Y DENTRO DEL ROI ------------
 
 # semaforo, persona, cebra, stop
 
