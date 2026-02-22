@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+
+
+# --------------- DETECCION CUANDO EL OBJETO ESTA CERCA -------------
+
+# semaforo, persona, cebra, stop
+
+
 import rclpy
 from rclpy.node import Node
 
@@ -59,31 +66,19 @@ class DetectionFilterNode(Node):
         # ----------------- Confidence ----------------
         self.declare_parameter('min_confidence', 0.70)
 
-
-
-
-
-        # ----------------- DEBUG GLOBAL (POR DEFECTO CERRADO) -----------------
-        # Si show_rois:=true -> open ROI
-        self.declare_parameter('show_rois', False)
-
-
-
-
-
         # =====================================================================
         # 2) STOP SIGN ROI (EN % - DERECHA CENTRO) + CERCA + DEBUG
         # =====================================================================
-        self.declare_parameter('stop_sign_roi_x_min', 0.95)
-        self.declare_parameter('stop_sign_roi_x_max', 1.0)
+        self.declare_parameter('stop_sign_roi_x_min', 0.62)
+        self.declare_parameter('stop_sign_roi_x_max', 0.98)
 
-        self.declare_parameter('stop_sign_roi_y_min', 0.25)
-        self.declare_parameter('stop_sign_roi_y_max', 0.45)
+        self.declare_parameter('stop_sign_roi_y_min', 0.35)
+        self.declare_parameter('stop_sign_roi_y_max', 0.65)
 
         # Cerca del auto
-        self.declare_parameter('stop_sign_min_bbox_area', 2400)  # 2500
+        self.declare_parameter('stop_sign_min_bbox_area', 2400) #2500
 
-        self.declare_parameter('stop_sign_debug_view', False)
+        self.declare_parameter('stop_sign_debug_view', True)
         self.declare_parameter('stop_sign_window_name', 'stop_debug')
 
         # =====================================================================
@@ -98,7 +93,7 @@ class DetectionFilterNode(Node):
         self.declare_parameter('zebra_vote_threshold', 5)
         self.declare_parameter('zebra_vote_window', 7)
 
-        self.declare_parameter('zebra_debug_view', False)
+        self.declare_parameter('zebra_debug_view', True)
         self.declare_parameter('zebra_window_name', "zebra_debug")
 
         # =====================================================================
@@ -135,7 +130,7 @@ class DetectionFilterNode(Node):
         self.declare_parameter('person_confirm_frames_on', 4)
         self.declare_parameter('person_confirm_frames_off', 8)
 
-        self.declare_parameter('person_debug_view', False)
+        self.declare_parameter('person_debug_view', True)
         self.declare_parameter('person_window_name', "person_debug")
 
         # =====================================================================
@@ -155,10 +150,6 @@ class DetectionFilterNode(Node):
         self.stop_sign_class_id = self.get_parameter('stop_sign_class_id').value
 
         self.min_confidence = float(self.get_parameter('min_confidence').value)
-
-        # Debug global
-        self.show_rois = bool(self.get_parameter('show_rois').value)
-        self._debug_windows_open = False
 
         # STOP ROI % + cerca
         self.stop_roi_x_min = float(self.get_parameter('stop_sign_roi_x_min').value)
@@ -253,7 +244,6 @@ class DetectionFilterNode(Node):
 
         self.get_logger().info(
             f"DetectionFilterNode listo | image_topic={self.image_topic} | detections_topic={self.detections_topic} | "
-            f"show_rois={self.show_rois} | "
             f"STOP ROI x=[{self.stop_roi_x_min:.2f},{self.stop_roi_x_max:.2f}] "
             f"y=[{self.stop_roi_y_min:.2f},{self.stop_roi_y_max:.2f}] "
             f"stop_min_area={int(self.stop_min_bbox_area)}"
@@ -408,49 +398,15 @@ class DetectionFilterNode(Node):
         self._publish_stop_sign(best_stop_sign, msg.header)
         self._publish_traffic_light_from_bbox(tl_best_bbox, tl_best_score, tl_roi_rect, msg.header)
 
-        # Debug: SOLO si show_rois=True (si es False NO abre nada)
-        if self.show_rois:
-            self._debug_windows_open = True
+        # Debug
+        if self.tl_debug_view:
+            self._tl_show_debug(img, tl_roi_rect, tl_best_bbox, self.tl_last_state, tl_best_area)
 
-            if self.tl_debug_view:
-                self._tl_show_debug(img, tl_roi_rect, tl_best_bbox, self.tl_last_state, tl_best_area)
+        if self.person_debug_view:
+            self._person_show_debug(img, person_roi_rect, best_person_bbox, best_person)
 
-            if self.person_debug_view:
-                self._person_show_debug(img, person_roi_rect, best_person_bbox, best_person)
-
-            if self.stop_debug_view:
-                self._stop_show_debug(img, stop_roi_rect, best_stop_bbox, best_stop_sign, best_stop_area)
-
-        else:
-            # Si antes estaban abiertas, ciérralas una vez
-            if self._debug_windows_open:
-                self._close_debug_windows()
-                self._debug_windows_open = False
-
-    # =============================================================================
-    # CERRAR VENTANAS DEBUG (solo las de este nodo)
-    # =============================================================================
-    def _close_debug_windows(self):
-        try:
-            # Traffic light windows
-            cv2.destroyWindow(self.tl_window_name)
-            cv2.destroyWindow("mask_red")
-            cv2.destroyWindow("mask_green")
-            cv2.destroyWindow("mask_yellow_kill")
-            cv2.destroyWindow("tl_crop")
-
-            # Person window
-            cv2.destroyWindow(self.person_window_name)
-
-            # Stop window
-            cv2.destroyWindow(self.stop_window_name)
-
-            # Zebra windows
-            cv2.destroyWindow(self.zebra_window_name)
-            cv2.destroyWindow("zebra_roi_crop")
-            cv2.destroyWindow("zebra_bw")
-        except Exception:
-            pass
+        if self.stop_debug_view:
+            self._stop_show_debug(img, stop_roi_rect, best_stop_bbox, best_stop_sign, best_stop_area)
 
     # =============================================================================
     # PERSON - histeresis
@@ -597,9 +553,7 @@ class DetectionFilterNode(Node):
             r_px = cv2.countNonZero(mask_r)
             g_px = cv2.countNonZero(mask_g)
 
-            # IMPORTANTE: NO mostrar nada si show_rois=False
-            if self.show_rois and self.tl_debug_view:
-                self._debug_windows_open = True
+            if self.tl_debug_view:
                 scale = 6
                 cv2.imshow("mask_red", cv2.resize(mask_r, None, fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST))
                 cv2.imshow("mask_green", cv2.resize(mask_g, None, fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST))
@@ -654,9 +608,7 @@ class DetectionFilterNode(Node):
                 self.zebra_votes.append(1 if present_raw else 0)
                 present = sum(self.zebra_votes) >= self.zebra_vote_threshold
 
-                # IMPORTANTE: NO mostrar nada si show_rois=False
-                if self.show_rois and self.zebra_debug_view and dbg is not None:
-                    self._debug_windows_open = True
+                if self.zebra_debug_view and dbg is not None:
                     cv2.imshow(self.zebra_window_name, dbg)
                     cv2.waitKey(1)
 
@@ -723,9 +675,7 @@ class DetectionFilterNode(Node):
 
             if not trans_counts:
                 dbg = self._zebra_make_debug(img_bgr, roi_rect, False, -1)
-                # IMPORTANTE: NO mostrar nada si show_rois=False
-                if self.show_rois and self.zebra_debug_view:
-                    self._debug_windows_open = True
+                if self.zebra_debug_view:
                     cv2.imshow("zebra_roi_crop", roi)
                     cv2.imshow("zebra_bw", bw)
                     cv2.waitKey(1)
@@ -735,9 +685,7 @@ class DetectionFilterNode(Node):
             stripe_count = int(np.floor(trans_med + 1))
             present = self.zebra_min_stripes <= stripe_count <= self.zebra_max_stripes
 
-            # IMPORTANTE: NO mostrar nada si show_rois=False
-            if self.show_rois and self.zebra_debug_view:
-                self._debug_windows_open = True
+            if self.zebra_debug_view:
                 cv2.imshow("zebra_roi_crop", roi)
                 cv2.imshow("zebra_bw", bw)
                 cv2.waitKey(1)
