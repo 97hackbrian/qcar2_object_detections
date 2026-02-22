@@ -42,7 +42,7 @@ def generate_launch_description():
         DeclareLaunchArgument('force_engine_update', default_value='False'),
         DeclareLaunchArgument('image_mean', default_value='[0.0, 0.0, 0.0]'),
         DeclareLaunchArgument('image_stddev', default_value='[1.0, 1.0, 1.0]'),
-        DeclareLaunchArgument('confidence_threshold', default_value='0.55'),
+        DeclareLaunchArgument('confidence_threshold', default_value='0.72'),
         DeclareLaunchArgument('nms_threshold', default_value='0.45'),
 
         # Detections / filter arguments

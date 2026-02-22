@@ -65,16 +65,18 @@ class DetectionFilterNode(Node):
         self.declare_parameter('stop_sign_class_id', '11')
 
         # ----------------- Confidence ----------------
-        self.declare_parameter('min_confidence', 0.70)
+        self.declare_parameter('min_confidence', 0.75)
 
         # =====================================================================
         # 2) STOP SIGN ROI (EN % - DERECHA CENTRO) + CERCA + DEBUG
         # =====================================================================
-        self.declare_parameter('stop_sign_roi_x_min', 0.62)
-        self.declare_parameter('stop_sign_roi_x_max', 0.98)
+        self.declare_parameter('stop_sign_roi_x_min', 0.95)
+        self.declare_parameter('stop_sign_roi_x_max', 1.0)
 
-        self.declare_parameter('stop_sign_roi_y_min', 0.35)
-        self.declare_parameter('stop_sign_roi_y_max', 0.65)
+        self.declare_parameter('stop_sign_roi_y_min', 0.25)
+        self.declare_parameter('stop_sign_roi_y_max', 0.45)
+
+        
 
         # Cerca del auto
         self.declare_parameter('stop_sign_min_bbox_area', 2400) #2500
