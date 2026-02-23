@@ -8,6 +8,7 @@
 
 # semaforo, persona, cebra, stop
 
+# FIXED = DIF VISTA POSTERIOR Y FRONTAL DEL STOP
 
 import rclpy
 from rclpy.node import Node
@@ -76,10 +77,8 @@ class DetectionFilterNode(Node):
         self.declare_parameter('stop_sign_roi_y_min', 0.25)
         self.declare_parameter('stop_sign_roi_y_max', 0.45)
 
-        
-
         # Cerca del auto
-        self.declare_parameter('stop_sign_min_bbox_area', 2400) #2500
+        self.declare_parameter('stop_sign_min_bbox_area', 2000) #2500
 
         self.declare_parameter('stop_sign_debug_view', True)
         self.declare_parameter('stop_sign_window_name', 'stop_debug')
@@ -269,6 +268,38 @@ class DetectionFilterNode(Node):
             self.get_logger().error(f'Zebra image conversion error: {e}')
 
     # =============================================================================
+    # STOP:  TRUE solo si hay ROJO presente en el bbox
+    # =============================================================================
+    def _stop_has_red_present(self, crop_bgr: np.ndarray) -> bool:
+        if crop_bgr is None or crop_bgr.size == 0:
+            return False
+
+        crop = cv2.resize(crop_bgr, (160, 160), interpolation=cv2.INTER_AREA)
+        hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+
+        # Rojo en HSV (dos rangos por el wrap de Hue)
+        lower1 = np.array([0, 90, 70], dtype=np.uint8)
+        upper1 = np.array([10, 255, 255], dtype=np.uint8)
+        lower2 = np.array([170, 90, 70], dtype=np.uint8)
+        upper2 = np.array([180, 255, 255], dtype=np.uint8)
+
+        mask1 = cv2.inRange(hsv, lower1, upper1)
+        mask2 = cv2.inRange(hsv, lower2, upper2)
+        red_mask = cv2.bitwise_or(mask1, mask2)
+
+        k = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN, k, iterations=1)
+
+        red_px = float(cv2.countNonZero(red_mask))
+        total_px = float(red_mask.size)
+
+        red_ratio = red_px / total_px  # 0..1
+
+        # Si el bbox es gris/blanco predominante = FALSE
+        # Umbral DE ROJO
+        return red_ratio >= 0.03
+
+    # =============================================================================
     # DETECTIONS CALLBACK
     # =============================================================================
     def detection_callback(self, msg: Detection2DArray):
@@ -395,6 +426,16 @@ class DetectionFilterNode(Node):
                     x1 = max(0, x1); y1 = max(0, y1)
                     x2 = min(w, x2); y2 = min(h, y2)
                     tl_best_bbox = (x1, y1, x2, y2)
+
+        # ====== STOP: MEJORA (SOLO AÑADIDO) ======
+        if best_stop_bbox is not None:
+            bx1, by1, bx2, by2 = best_stop_bbox
+            stop_crop = img[by1:by2, bx1:bx2]
+            if not self._stop_has_red_present(stop_crop):
+                best_stop_sign = None
+                best_stop_bbox = None
+                best_stop_area = 0.0
+        # =========================================
 
         # Publish
         self._publish_person(best_person, msg.header)

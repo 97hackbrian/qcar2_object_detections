@@ -169,10 +169,10 @@ def generate_launch_description():
 
                 #  -------------- VISUALIZACION ------------
                 # elegir with true or false
-                'person_debug_view': True,
-                'stop_sign_debug_view': False,
+                'person_debug_view': False,
+                'stop_sign_debug_view': True,
                 'zebra_debug_view': False,
-                'traffic_light_debug_view': True,
+                'traffic_light_debug_view': False,
 
 
 
