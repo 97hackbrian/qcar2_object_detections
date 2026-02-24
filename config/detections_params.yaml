@@ -32,7 +32,7 @@ detection_filter_node:
     stop_sign_class_id: "11"
 
     # ----------------- Thresholds ----------------
-    min_confidence: 0.75
+    min_confidence: 0.60
 
     # ===================== DEBUG VIEWS =====================
     person_debug_view: true

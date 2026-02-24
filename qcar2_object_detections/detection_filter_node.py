@@ -66,7 +66,7 @@ class DetectionFilterNode(Node):
         self.declare_parameter('stop_sign_class_id', '11')
 
         # ----------------- Confidence ----------------
-        self.declare_parameter('min_confidence', 0.75)
+        self.declare_parameter('min_confidence', 0.6)
 
         # =====================================================================
         # 2) STOP SIGN ROI (EN % - DERECHA CENTRO) + CERCA + DEBUG

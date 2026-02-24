@@ -54,7 +54,7 @@ def generate_launch_description():
         DeclareLaunchArgument('stop_sign_output_topic', default_value='/detections/stop_sign'),
         DeclareLaunchArgument('zebra_output_topic', default_value='/detections/zebra_crossing'),
 
-        DeclareLaunchArgument('min_confidence', default_value='0.70'),
+        DeclareLaunchArgument('min_confidence', default_value='0.60'),
         DeclareLaunchArgument('zebra_enabled', default_value='True'),
     ]
 
@@ -170,9 +170,9 @@ def generate_launch_description():
                 #  -------------- VISUALIZACION ------------
                 # elegir with true or false
                 'person_debug_view': False,
-                'stop_sign_debug_view': True,
-                'zebra_debug_view': False,
-                'traffic_light_debug_view': False,
+                'stop_sign_debug_view': False,
+                'zebra_debug_view': True,
+                'traffic_light_debug_view': True,
 
 
 
