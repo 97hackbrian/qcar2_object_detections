@@ -35,13 +35,13 @@ detection_filter_node:
     min_confidence: 0.60
 
     # ===================== DEBUG VIEWS =====================
-    person_debug_view: true
+    person_debug_view: false
     person_window_name: "person_debug"
 
-    stop_sign_debug_view: true
+    stop_sign_debug_view: false
     stop_sign_window_name: "stop_debug"
 
-    traffic_light_debug_view: true
+    traffic_light_debug_view: false
 
     zebra_debug_view: true
     zebra_window_name: "zebra_debug"
@@ -72,13 +72,13 @@ detection_filter_node:
 
     # ===================== ZEBRA =====================
     zebra_enabled: true
-    zebra_roi_top: 0.74
-    zebra_roi_bottom: 0.955
-    zebra_roi_width: 0.40
-    zebra_min_stripes: 4
-    zebra_max_stripes: 7
-    zebra_vote_threshold: 5
-    zebra_vote_window: 7
+    zebra_roi_top: 0.75
+    zebra_roi_bottom: 0.99
+    zebra_roi_width: 0.8
+    zebra_min_stripes: 5
+    zebra_max_stripes: 13
+    zebra_vote_threshold: 2
+    zebra_vote_window: 8
 
     # ===================== TRAFFIC LIGHT =====================
     traffic_light_roi_x_min: 0.25
