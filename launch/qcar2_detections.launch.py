@@ -56,6 +56,16 @@ def generate_launch_description():
 
         DeclareLaunchArgument('min_confidence', default_value='0.60'),
         DeclareLaunchArgument('zebra_enabled', default_value='True'),
+
+        # Debug view arguments (set to True to enable GUI windows)
+        DeclareLaunchArgument('person_debug_view', default_value='False',
+                              description='Enable person detection debug window'),
+        DeclareLaunchArgument('stop_sign_debug_view', default_value='False',
+                              description='Enable stop sign detection debug window'),
+        DeclareLaunchArgument('traffic_light_debug_view', default_value='False',
+                              description='Enable traffic light detection debug window'),
+        DeclareLaunchArgument('zebra_debug_view', default_value='False',
+                              description='Enable zebra crossing detection debug window'),
     ]
 
     # ---------------------------
@@ -94,6 +104,11 @@ def generate_launch_description():
 
     min_confidence = LaunchConfiguration('min_confidence')
     zebra_enabled = LaunchConfiguration('zebra_enabled')
+
+    person_debug_view = LaunchConfiguration('person_debug_view')
+    stop_sign_debug_view = LaunchConfiguration('stop_sign_debug_view')
+    traffic_light_debug_view = LaunchConfiguration('traffic_light_debug_view')
+    zebra_debug_view = LaunchConfiguration('zebra_debug_view')
 
     # ---------------------------
     # Nodes
@@ -168,11 +183,11 @@ def generate_launch_description():
 
 
                 #  -------------- VISUALIZACION ------------
-                # elegir with true or false
-                'person_debug_view': False,
-                'stop_sign_debug_view': False,
-                'zebra_debug_view': True,
-                'traffic_light_debug_view': True,
+                # Controlled via launch arguments
+                'person_debug_view': person_debug_view,
+                'stop_sign_debug_view': stop_sign_debug_view,
+                'zebra_debug_view': zebra_debug_view,
+                'traffic_light_debug_view': traffic_light_debug_view,
 
 
 

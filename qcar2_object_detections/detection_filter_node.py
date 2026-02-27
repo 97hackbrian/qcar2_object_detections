@@ -80,7 +80,7 @@ class DetectionFilterNode(Node):
         # Cerca del auto
         self.declare_parameter('stop_sign_min_bbox_area', 2000) #2500
 
-        self.declare_parameter('stop_sign_debug_view', True)
+        self.declare_parameter('stop_sign_debug_view', False)
         self.declare_parameter('stop_sign_window_name', 'stop_debug')
 
         # =====================================================================
@@ -95,7 +95,7 @@ class DetectionFilterNode(Node):
         self.declare_parameter('zebra_vote_threshold', 5)
         self.declare_parameter('zebra_vote_window', 7)
 
-        self.declare_parameter('zebra_debug_view', True)
+        self.declare_parameter('zebra_debug_view', False)
         self.declare_parameter('zebra_window_name', "zebra_debug")
 
         # =====================================================================
@@ -109,7 +109,7 @@ class DetectionFilterNode(Node):
         self.declare_parameter('traffic_light_min_bbox_area', 600)
         self.declare_parameter('traffic_light_confirm_frames', 3)
 
-        self.declare_parameter('traffic_light_debug_view', True)
+        self.declare_parameter('traffic_light_debug_view', False)
         self.declare_parameter('traffic_light_sensitivity', 8)
 
         self.declare_parameter('traffic_light_red_lower', [0, 160, 160])
@@ -132,7 +132,7 @@ class DetectionFilterNode(Node):
         self.declare_parameter('person_confirm_frames_on', 4)
         self.declare_parameter('person_confirm_frames_off', 8)
 
-        self.declare_parameter('person_debug_view', True)
+        self.declare_parameter('person_debug_view', False)
         self.declare_parameter('person_window_name', "person_debug")
 
         # =====================================================================
@@ -256,7 +256,9 @@ class DetectionFilterNode(Node):
     # =============================================================================
     def image_callback(self, msg: Image):
         try:
-            self.current_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+            img = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+            with self.lock:
+                self.current_image = img
         except Exception as e:
             self.get_logger().error(f'Image conversion error: {e}')
 
@@ -315,13 +317,15 @@ class DetectionFilterNode(Node):
         tl_best_area = 0.0
         tl_best_score = 0.0
 
-        if self.current_image is None:
+        with self.lock:
+            img = self.current_image.copy() if self.current_image is not None else None
+
+        if img is None:
             self._publish_person(None, msg.header)
             self._publish_stop_sign(None, msg.header)
             self._publish_traffic_light_from_bbox(None, 0.0, (0, 0, 0, 0), msg.header)
             return
 
-        img = self.current_image
         h, w = img.shape[:2]
 
         # STOP ROI sobre la imagen de detección
@@ -497,8 +501,11 @@ class DetectionFilterNode(Node):
         cv2.putText(dbg, txt, (10, 35),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2)
 
-        cv2.imshow(self.person_window_name, dbg)
-        cv2.waitKey(1)
+        try:
+            cv2.imshow(self.person_window_name, dbg)
+            cv2.waitKey(1)
+        except Exception:
+            pass
 
     # =============================================================================
     # STOP SIGN
@@ -533,8 +540,11 @@ class DetectionFilterNode(Node):
             2
         )
 
-        cv2.imshow(self.stop_window_name, dbg)
-        cv2.waitKey(1)
+        try:
+            cv2.imshow(self.stop_window_name, dbg)
+            cv2.waitKey(1)
+        except Exception:
+            pass
 
     # =============================================================================
     # TRAFFIC LIGHT
@@ -598,12 +608,15 @@ class DetectionFilterNode(Node):
             g_px = cv2.countNonZero(mask_g)
 
             if self.tl_debug_view:
-                scale = 6
-                cv2.imshow("mask_red", cv2.resize(mask_r, None, fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST))
-                cv2.imshow("mask_green", cv2.resize(mask_g, None, fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST))
-                cv2.imshow("mask_yellow_kill", cv2.resize(mask_yellow, None, fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST))
-                cv2.imshow("tl_crop", cv2.resize(roi_bgr, None, fx=6, fy=6, interpolation=cv2.INTER_NEAREST))
-                cv2.waitKey(1)
+                try:
+                    scale = 6
+                    cv2.imshow("mask_red", cv2.resize(mask_r, None, fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST))
+                    cv2.imshow("mask_green", cv2.resize(mask_g, None, fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST))
+                    cv2.imshow("mask_yellow_kill", cv2.resize(mask_yellow, None, fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST))
+                    cv2.imshow("tl_crop", cv2.resize(roi_bgr, None, fx=6, fy=6, interpolation=cv2.INTER_NEAREST))
+                    cv2.waitKey(1)
+                except Exception:
+                    pass
 
             total = int(roi_bgr.shape[0] * roi_bgr.shape[1])
             min_px = max(int(self.tl_sensitivity), int(0.005 * total))
@@ -635,30 +648,40 @@ class DetectionFilterNode(Node):
                     (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9,
                     (0, 255, 255), 2)
 
-        cv2.imshow(self.tl_window_name, dbg)
-        cv2.waitKey(1)
+        try:
+            cv2.imshow(self.tl_window_name, dbg)
+            cv2.waitKey(1)
+        except Exception:
+            pass
 
     # =============================================================================
     # ZEBRA (thread)
     # =============================================================================
     def _zebra_loop(self):
         while rclpy.ok():
-            with self.lock:
-                img = None if self.zebra_image is None else self.zebra_image.copy()
+            try:
+                with self.lock:
+                    img = None if self.zebra_image is None else self.zebra_image.copy()
 
-            if img is not None:
-                present_raw, stripe_count, dbg = self._detect_zebra(img)
+                if img is not None:
+                    present_raw, stripe_count, dbg = self._detect_zebra(img)
 
-                self.zebra_votes.append(1 if present_raw else 0)
-                present = sum(self.zebra_votes) >= self.zebra_vote_threshold
+                    self.zebra_votes.append(1 if present_raw else 0)
+                    present = sum(self.zebra_votes) >= self.zebra_vote_threshold
 
-                if self.zebra_debug_view and dbg is not None:
-                    cv2.imshow(self.zebra_window_name, dbg)
-                    cv2.waitKey(1)
+                    if self.zebra_debug_view and dbg is not None:
+                        try:
+                            cv2.imshow(self.zebra_window_name, dbg)
+                            cv2.waitKey(1)
+                        except Exception:
+                            pass
 
-                if present != self.last_zebra_state:
-                    self.last_zebra_state = present
-                    self._publish_zebra(present, stripe_count)
+                    if present != self.last_zebra_state:
+                        self.last_zebra_state = present
+                        self._publish_zebra(present, stripe_count)
+
+            except Exception as e:
+                self.get_logger().error(f'Zebra loop error: {e}')
 
             time.sleep(0.05)
 
@@ -720,9 +743,12 @@ class DetectionFilterNode(Node):
             if not trans_counts:
                 dbg = self._zebra_make_debug(img_bgr, roi_rect, False, -1)
                 if self.zebra_debug_view:
-                    cv2.imshow("zebra_roi_crop", roi)
-                    cv2.imshow("zebra_bw", bw)
-                    cv2.waitKey(1)
+                    try:
+                        cv2.imshow("zebra_roi_crop", roi)
+                        cv2.imshow("zebra_bw", bw)
+                        cv2.waitKey(1)
+                    except Exception:
+                        pass
                 return False, -1, dbg
 
             trans_med = float(np.median(trans_counts))
@@ -730,9 +756,12 @@ class DetectionFilterNode(Node):
             present = self.zebra_min_stripes <= stripe_count <= self.zebra_max_stripes
 
             if self.zebra_debug_view:
-                cv2.imshow("zebra_roi_crop", roi)
-                cv2.imshow("zebra_bw", bw)
-                cv2.waitKey(1)
+                try:
+                    cv2.imshow("zebra_roi_crop", roi)
+                    cv2.imshow("zebra_bw", bw)
+                    cv2.waitKey(1)
+                except Exception:
+                    pass
 
             dbg = self._zebra_make_debug(img_bgr, roi_rect, present, stripe_count)
             return present, stripe_count, dbg
