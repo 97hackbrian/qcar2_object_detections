@@ -28,6 +28,7 @@ ament_export_dependencies(rosidl_default_runtime)
 install(PROGRAMS
   qcar2_object_detections/image_preprocessor_node.py
   qcar2_object_detections/detection_filter_node.py
+  qcar2_object_detections/detection_visualizer_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

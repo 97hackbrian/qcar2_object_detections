@@ -4,6 +4,7 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 
+import launch
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -66,6 +67,12 @@ def generate_launch_description():
                               description='Enable traffic light detection debug window'),
         DeclareLaunchArgument('zebra_debug_view', default_value='False',
                               description='Enable zebra crossing detection debug window'),
+
+        # Visualizer
+        DeclareLaunchArgument('enable_visualizer', default_value='True',
+                              description='Enable detection visualizer debug image'),
+        DeclareLaunchArgument('debug_image_topic', default_value='/detections/debug_image',
+                              description='Output topic for annotated debug image'),
     ]
 
     # ---------------------------
@@ -109,6 +116,9 @@ def generate_launch_description():
     stop_sign_debug_view = LaunchConfiguration('stop_sign_debug_view')
     traffic_light_debug_view = LaunchConfiguration('traffic_light_debug_view')
     zebra_debug_view = LaunchConfiguration('zebra_debug_view')
+
+    enable_visualizer = LaunchConfiguration('enable_visualizer')
+    debug_image_topic = LaunchConfiguration('debug_image_topic')
 
     # ---------------------------
     # Nodes
@@ -195,8 +205,31 @@ def generate_launch_description():
         ]
     )
 
+    detection_visualizer_node = Node(
+        package='qcar2_object_detections',
+        executable='detection_visualizer_node.py',
+        name='detection_visualizer_node',
+        output='screen',
+        parameters=[
+            params_file,
+            {
+                'image_topic': preprocessed_image_topic,
+                'detections_input_topic': detections_input_topic,
+                'zebra_image_topic': zebra_image_topic,
+                'person_state_topic': person_output_topic,
+                'traffic_light_state_topic': traffic_light_output_topic,
+                'stop_sign_state_topic': stop_sign_output_topic,
+                'zebra_state_topic': zebra_output_topic,
+                'output_image_topic': debug_image_topic,
+                'min_confidence': min_confidence,
+            }
+        ],
+        condition=launch.conditions.IfCondition(enable_visualizer),
+    )
+
     return LaunchDescription(launch_args + [
         image_preprocessor_node,
         yolov8_launch,
         detection_filter_node,
+        detection_visualizer_node,
     ])
