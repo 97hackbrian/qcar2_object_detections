@@ -23,6 +23,7 @@ setup(
             'image_preprocessor_node = qcar2_object_detections.image_preprocessor_node:main',
             'detection_filter_node = qcar2_object_detections.detection_filter_node:main',
             'detection_visualizer_node = qcar2_object_detections.detection_visualizer_node:main',
+            'image_compressor_node = qcar2_object_detections.image_compressor_node:main',
         ],
     },
 )

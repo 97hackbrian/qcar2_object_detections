@@ -227,9 +227,19 @@ def generate_launch_description():
         condition=launch.conditions.IfCondition(enable_visualizer),
     )
 
+
+
+    image_compressor_node = Node(
+        package='qcar2_object_detections',
+        executable='image_compressor_node.py',
+        name='image_compressor_node',
+        output='screen'
+    )
+
     return LaunchDescription(launch_args + [
         image_preprocessor_node,
         yolov8_launch,
         detection_filter_node,
         detection_visualizer_node,
+        image_compressor_node,
     ])
