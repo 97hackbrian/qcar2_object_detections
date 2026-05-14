@@ -29,7 +29,7 @@ class ImagePreprocessorNode(Node):
         super().__init__('image_preprocessor_node')
         
         # Declare parameters
-        self.declare_parameter('input_image_topic', '/camera/color_image')
+        self.declare_parameter('input_image_topic', '/camera/csi_image_2')
         self.declare_parameter('output_image_topic', '/image')
         self.declare_parameter('input_width', 640)
         self.declare_parameter('input_height', 480)

@@ -25,10 +25,10 @@ def generate_launch_description():
         DeclareLaunchArgument('params_file', default_value=default_params_file,
                               description='Full parameter YAML file'),
 
-        DeclareLaunchArgument('input_image_topic', default_value='/camera/color_image'),
+        DeclareLaunchArgument('input_image_topic', default_value='/camera/csi_image_2'),
         DeclareLaunchArgument('preprocessed_image_topic', default_value='/image'),
-        DeclareLaunchArgument('input_width', default_value='640'),
-        DeclareLaunchArgument('input_height', default_value='480'),
+        DeclareLaunchArgument('input_width', default_value='820'),
+        DeclareLaunchArgument('input_height', default_value='616'),
         DeclareLaunchArgument('target_width', default_value='640'),
         DeclareLaunchArgument('target_height', default_value='640'),
 
