@@ -68,7 +68,7 @@ detection_filter_node:
     #stop_sign_roi_y_max: 0.75
 
     # ===================== ZEBRA =====================
-    zebra_enabled: true
+    zebra_enabled: false
     zebra_roi_top: 0.75
     zebra_roi_bottom: 0.99
     zebra_roi_width: 0.8
