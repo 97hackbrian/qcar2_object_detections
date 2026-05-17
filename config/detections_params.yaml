@@ -5,13 +5,21 @@
 image_preprocessor_node:
   ros__parameters:
     input_image_topic: "/camera/csi_image_2"
+    
+    #input_image_topic: "/camera/color_image"
+    
     output_image_topic: "/image"
     input_width: 820
     input_height: 616
+
+    #input_width: 640
+    #input_height: 480
+
     target_width: 640
     target_height: 640
     padding_color: [0, 0, 0]
     input_encoding: "bgr8"
+    yolo_confidence_threshold: 0.01
 
 detection_filter_node:
   ros__parameters:

@@ -2,11 +2,12 @@
 # -*- coding: utf-8 -*-
 
 import os
+import yaml
 from ament_index_python.packages import get_package_share_directory
 
 import launch
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -38,8 +39,7 @@ def generate_launch_description():
         DeclareLaunchArgument('force_engine_update', default_value='False'),
         DeclareLaunchArgument('image_mean', default_value='[0.0, 0.0, 0.0]'),
         DeclareLaunchArgument('image_stddev', default_value='[1.0, 1.0, 1.0]'),
-        DeclareLaunchArgument('confidence_threshold', default_value='0.75'),
-        DeclareLaunchArgument('nms_threshold', default_value='0.45'),
+        DeclareLaunchArgument('nms_threshold', default_value='0.01'),
 
         # Visualizer
         DeclareLaunchArgument('enable_visualizer', default_value='True',
@@ -64,78 +64,89 @@ def generate_launch_description():
     force_engine_update = LaunchConfiguration('force_engine_update')
     image_mean = LaunchConfiguration('image_mean')
     image_stddev = LaunchConfiguration('image_stddev')
-    confidence_threshold = LaunchConfiguration('confidence_threshold')
     nms_threshold = LaunchConfiguration('nms_threshold')
 
     enable_visualizer = LaunchConfiguration('enable_visualizer')
 
-    # ---------------------------
-    # Nodes
-    # ---------------------------
-    image_preprocessor_node = Node(
-        package='qcar2_object_detections',
-        executable='image_preprocessor_node.py',
-        name='image_preprocessor_node',
-        output='screen',
-        parameters=[params_file]
-    )
+    def launch_setup(context, *args, **kwargs):
+        params_path = LaunchConfiguration('params_file').perform(context)
+        with open(params_path, 'r', encoding='utf-8') as f:
+            params_yaml = yaml.safe_load(f) or {}
 
-    yolov8_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([
-            get_package_share_directory('isaac_ros_yolov8'),
-            '/launch/isaac_ros_yolov8_visualize.launch.py'
-        ]),
-        launch_arguments={
-            'model_file_path': model_file_path,
-            'engine_file_path': engine_file_path,
-            'input_binding_names': input_binding_names,
-            'output_binding_names': output_binding_names,
-            'network_image_width': network_image_width,
-            'network_image_height': network_image_height,
-            'input_image_width': input_image_width,
-            'input_image_height': input_image_height,
-            'image_name': preprocessed_image_topic,
-            'force_engine_update': force_engine_update,
-            'image_mean': image_mean,
-            'image_stddev': image_stddev,
-            'confidence_threshold': confidence_threshold,
-            'nms_threshold': nms_threshold,
-            'bounding_box_scale': '1.0',
-            'setup_image_viewer': 'False',
-        }.items()
-    )
+        confidence_threshold_value = 0.75
+        preproc_params = params_yaml.get('image_preprocessor_node', {}).get('ros__parameters', {})
+        if 'yolo_confidence_threshold' in preproc_params:
+            confidence_threshold_value = preproc_params.get('yolo_confidence_threshold', 0.75)
+        else:
+            confidence_threshold_value = params_yaml.get('yolo_confidence_threshold', 0.75)
 
-    detection_filter_node = Node(
-        package='qcar2_object_detections',
-        executable='detection_filter_node.py',
-        name='detection_filter_node',
-        output='screen',
-        parameters=[params_file]
-    )
+        # ---------------------------
+        # Nodes
+        # ---------------------------
+        image_preprocessor_node = Node(
+            package='qcar2_object_detections',
+            executable='image_preprocessor_node.py',
+            name='image_preprocessor_node',
+            output='screen',
+            parameters=[params_file]
+        )
 
-    detection_visualizer_node = Node(
-        package='qcar2_object_detections',
-        executable='detection_visualizer_node.py',
-        name='detection_visualizer_node',
-        output='screen',
-        parameters=[params_file],
-        condition=launch.conditions.IfCondition(enable_visualizer),
-    )
+        yolov8_launch = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                get_package_share_directory('isaac_ros_yolov8'),
+                '/launch/isaac_ros_yolov8_visualize.launch.py'
+            ]),
+            launch_arguments={
+                'model_file_path': model_file_path,
+                'engine_file_path': engine_file_path,
+                'input_binding_names': input_binding_names,
+                'output_binding_names': output_binding_names,
+                'network_image_width': network_image_width,
+                'network_image_height': network_image_height,
+                'input_image_width': input_image_width,
+                'input_image_height': input_image_height,
+                'image_name': preprocessed_image_topic,
+                'force_engine_update': force_engine_update,
+                'image_mean': image_mean,
+                'image_stddev': image_stddev,
+                'confidence_threshold': str(confidence_threshold_value),
+                'nms_threshold': nms_threshold,
+                'bounding_box_scale': '1.0',
+                'setup_image_viewer': 'False',
+            }.items()
+        )
 
+        detection_filter_node = Node(
+            package='qcar2_object_detections',
+            executable='detection_filter_node.py',
+            name='detection_filter_node',
+            output='screen',
+            parameters=[params_file]
+        )
 
+        detection_visualizer_node = Node(
+            package='qcar2_object_detections',
+            executable='detection_visualizer_node.py',
+            name='detection_visualizer_node',
+            output='screen',
+            parameters=[params_file],
+            condition=launch.conditions.IfCondition(enable_visualizer),
+        )
 
-    image_compressor_node = Node(
-        package='qcar2_object_detections',
-        executable='image_compressor_node.py',
-        name='image_compressor_node',
-        output='screen',
-        parameters=[params_file]
-    )
+        image_compressor_node = Node(
+            package='qcar2_object_detections',
+            executable='image_compressor_node.py',
+            name='image_compressor_node',
+            output='screen',
+            parameters=[params_file]
+        )
 
-    return LaunchDescription(launch_args + [
-        image_preprocessor_node,
-        yolov8_launch,
-        detection_filter_node,
-        detection_visualizer_node,
-        image_compressor_node,
-    ])
+        return [
+            image_preprocessor_node,
+            yolov8_launch,
+            detection_filter_node,
+            detection_visualizer_node,
+            image_compressor_node,
+        ]
+
+    return LaunchDescription(launch_args + [OpaqueFunction(function=launch_setup)])
