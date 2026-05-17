@@ -122,9 +122,9 @@ class DetectionFilterNode(Node):
         # =====================================================================
         # 5) PERSON PARAMETERS (con histeresis)
         # =====================================================================
-        self.declare_parameter('person_roi_x_min', 0.25)
-        self.declare_parameter('person_roi_x_max', 0.76)
-        self.declare_parameter('person_roi_y_min', 0.20)
+        self.declare_parameter('person_roi_x_min', 0.35)
+        self.declare_parameter('person_roi_x_max', 0.65)
+        self.declare_parameter('person_roi_y_min', 0.50)
         self.declare_parameter('person_roi_y_max', 0.85)
 
         self.declare_parameter('person_min_bbox_area', 10500)
