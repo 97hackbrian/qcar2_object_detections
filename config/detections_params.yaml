@@ -19,7 +19,17 @@ image_preprocessor_node:
     target_height: 640
     padding_color: [0, 0, 0]
     input_encoding: "bgr8"
-    yolo_confidence_threshold: 0.01
+    yolo_confidence_threshold: 0.15
+
+    # ===================== CLAHE (Contrast Enhancement) =====================
+    # CLAHE = Contrast Limited Adaptive Histogram Equalization
+    # Improves contrast for better object detection, especially for bright objects
+    clahe_enabled: true
+    clahe_clip_limit: 5.0      # Limit for contrast amplification (2.0-5.0 recommended, INCREASED for better contrast)
+    clahe_tile_size: 15        # Size of tiles for local contrast (8, 16, 32 common)
+    
+    # Optional: Brightness adjustment after CLAHE
+    brightness_adjustment: -55.0  # Range: -50 to +50 (0 = no adjustment)
 
 detection_filter_node:
   ros__parameters:
@@ -57,17 +67,17 @@ detection_filter_node:
     # ===================== PERSON (ROI en %) =====================
     person_roi_x_min: 0.3
     person_roi_x_max: 0.7
-    person_roi_y_min: 0.60
+    person_roi_y_min: 0.70
     person_roi_y_max: 0.95
     person_min_bbox_area: 10000
     person_confirm_frames_on: 2
     person_confirm_frames_off: 8
 
     # ===================== STOP SIGN (ROI en %) =====================
-    stop_sign_roi_x_min: 0.9
+    stop_sign_roi_x_min: 0.85
     stop_sign_roi_x_max: 1.0
-    stop_sign_roi_y_min: 0.20
-    stop_sign_roi_y_max: 0.80
+    stop_sign_roi_y_min: 0.05
+    stop_sign_roi_y_max: 0.50
 
     #Con estos valores el robot para muy antes
     #stop_sign_roi_x_min: 0.62
