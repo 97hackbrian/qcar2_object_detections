@@ -41,9 +41,6 @@ def generate_launch_description():
         DeclareLaunchArgument('image_stddev', default_value='[1.0, 1.0, 1.0]'),
         DeclareLaunchArgument('nms_threshold', default_value='0.01'),
 
-        # Visualizer
-        DeclareLaunchArgument('enable_visualizer', default_value='True',
-                              description='Enable detection visualizer debug image'),
     ]
 
     # ---------------------------
@@ -65,8 +62,6 @@ def generate_launch_description():
     image_mean = LaunchConfiguration('image_mean')
     image_stddev = LaunchConfiguration('image_stddev')
     nms_threshold = LaunchConfiguration('nms_threshold')
-
-    enable_visualizer = LaunchConfiguration('enable_visualizer')
 
     def launch_setup(context, *args, **kwargs):
         params_path = LaunchConfiguration('params_file').perform(context)
@@ -124,15 +119,6 @@ def generate_launch_description():
             parameters=[params_file]
         )
 
-        detection_visualizer_node = Node(
-            package='qcar2_object_detections',
-            executable='detection_visualizer_node.py',
-            name='detection_visualizer_node',
-            output='screen',
-            parameters=[params_file],
-            condition=launch.conditions.IfCondition(enable_visualizer),
-        )
-
         image_compressor_node = Node(
             package='qcar2_object_detections',
             executable='image_compressor_node.py',
@@ -145,7 +131,6 @@ def generate_launch_description():
             image_preprocessor_node,
             yolov8_launch,
             detection_filter_node,
-            detection_visualizer_node,
             image_compressor_node,
         ]
 

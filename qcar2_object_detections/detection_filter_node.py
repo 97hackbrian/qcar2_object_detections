@@ -32,6 +32,13 @@ from qcar2_object_detections.msg import (
 )
 
 
+COLOR_FAIL = (128, 128, 128)
+COLOR_PERSON = (0, 255, 0)
+COLOR_STOP = (0, 0, 255)
+COLOR_TL = (0, 255, 255)
+COLOR_ZEBRA = (255, 255, 0)
+
+
 class DetectionFilterNode(Node):
     def __init__(self):
         super().__init__('detection_filter_node')
@@ -136,7 +143,16 @@ class DetectionFilterNode(Node):
         self.declare_parameter('person_window_name', "person_debug")
 
         # =====================================================================
-        # 6) GET PARAMETERS
+        # 6) DEBUG IMAGE OUTPUT (integrated visualizer)
+        # =====================================================================
+        self.declare_parameter('debug_image_enabled', True)
+        self.declare_parameter('output_image_topic', '/detections/debug_image')
+        self.declare_parameter('debug_publish_hz', 5.0)
+        self.declare_parameter('debug_output_width', 320)
+        self.declare_parameter('debug_output_height', 320)
+
+        # =====================================================================
+        # 7) GET PARAMETERS
         # =====================================================================
         self.image_topic = self.get_parameter('image_topic').value
         self.detections_topic = self.get_parameter('detections_input_topic').value
@@ -205,8 +221,22 @@ class DetectionFilterNode(Node):
         self.person_debug_view = bool(self.get_parameter('person_debug_view').value)
         self.person_window_name = str(self.get_parameter('person_window_name').value)
 
+        # Integrated debug image params
+        self.debug_image_enabled = bool(self.get_parameter('debug_image_enabled').value)
+        self.output_image_topic = str(self.get_parameter('output_image_topic').value)
+        self.debug_publish_hz = float(self.get_parameter('debug_publish_hz').value)
+        if self.debug_publish_hz <= 0.0:
+            self.debug_publish_hz = 5.0
+        self.debug_publish_period = 1.0 / self.debug_publish_hz
+        self.debug_output_width = int(self.get_parameter('debug_output_width').value)
+        self.debug_output_height = int(self.get_parameter('debug_output_height').value)
+        if self.debug_output_width <= 0:
+            self.debug_output_width = 320
+        if self.debug_output_height <= 0:
+            self.debug_output_height = 320
+
         # =====================================================================
-        # 7) INTERNAL STATES
+        # 8) INTERNAL STATES
         # =====================================================================
         self.zebra_votes = deque(maxlen=self.zebra_vote_window)
         self.last_zebra_state = None
@@ -220,8 +250,21 @@ class DetectionFilterNode(Node):
         self.person_on_count = 0
         self.person_off_count = 0
 
+        self.last_person_msg = PersonDetection()
+        self.last_tl_msg = TrafficLightDetection()
+        self.last_stop_msg = StopSignDetection()
+        self.last_zebra_msg = ZebraCrossingDetection()
+
+        self._last_debug_pub_time = 0.0
+
+        self._class_names = {
+            self.person_class_id: 'person',
+            self.traffic_light_class_id: 'traffic_light',
+            self.stop_sign_class_id: 'stop_sign',
+        }
+
         # =====================================================================
-        # 8) SUBSCRIBERS
+        # 9) SUBSCRIBERS
         # =====================================================================
         self.image_sub = self.create_subscription(Image, self.image_topic, self.image_callback, 10)
         self.detection_sub = self.create_subscription(Detection2DArray, self.detections_topic, self.detection_callback, 10)
@@ -230,15 +273,19 @@ class DetectionFilterNode(Node):
             self.zebra_image_sub = self.create_subscription(Image, self.zebra_image_topic, self.zebra_image_callback, 10)
 
         # =====================================================================
-        # 9) PUBLISHERS
+        # 10) PUBLISHERS
         # =====================================================================
         self.person_pub = self.create_publisher(PersonDetection, self.person_output_topic, 10)
         self.traffic_light_pub = self.create_publisher(TrafficLightDetection, self.traffic_light_output_topic, 10)
         self.stop_sign_pub = self.create_publisher(StopSignDetection, self.stop_sign_output_topic, 10)
         self.zebra_pub = self.create_publisher(ZebraCrossingDetection, self.zebra_output_topic, 10)
+        if self.debug_image_enabled:
+            self.debug_image_pub = self.create_publisher(Image, self.output_image_topic, 10)
+        else:
+            self.debug_image_pub = None
 
         # =====================================================================
-        # 10) ZEBRA THREAD
+        # 11) ZEBRA THREAD
         # =====================================================================
         if self.zebra_enabled:
             self.zebra_thread = threading.Thread(target=self._zebra_loop, daemon=True)
@@ -316,6 +363,7 @@ class DetectionFilterNode(Node):
         tl_best_bbox = None
         tl_best_area = 0.0
         tl_best_score = 0.0
+        debug_entries = []
 
         with self.lock:
             img = self.current_image.copy() if self.current_image is not None else None
@@ -355,22 +403,35 @@ class DetectionFilterNode(Node):
 
             class_id = str(det.results[0].hypothesis.class_id)
             score = float(det.results[0].hypothesis.score)
+            cx = float(det.bbox.center.position.x)
+            cy = float(det.bbox.center.position.y)
+
+            if class_id not in self._class_names:
+                continue
+
+            sx = float(det.bbox.size_x)
+            sy = float(det.bbox.size_y)
+            x1 = int(cx - sx / 2)
+            y1 = int(cy - sy / 2)
+            x2 = int(cx + sx / 2)
+            y2 = int(cy + sy / 2)
+            x1 = max(0, x1)
+            y1 = max(0, y1)
+            x2 = min(w, x2)
+            y2 = min(h, y2)
+
+            area = float(sx * sy)
+            passes = self._check_debug_filters(class_id, cx, cy, area, score, person_roi_rect, stop_roi_rect, tl_roi_rect)
+            debug_entries.append((class_id, score, (x1, y1, x2, y2), passes))
 
             if score < self.min_confidence:
                 continue
 
-            cx = float(det.bbox.center.position.x)
-            cy = float(det.bbox.center.position.y)
-
             # PERSON
             if class_id == self.person_class_id:
-                sx = float(det.bbox.size_x)
-                sy = float(det.bbox.size_y)
-
                 if not (prx1 <= cx <= prx2 and pry1 <= cy <= pry2):
                     continue
 
-                area = float(sx * sy)
                 if area < self.person_min_bbox_area:
                     continue
 
@@ -386,15 +447,14 @@ class DetectionFilterNode(Node):
 
             # STOP: dentro ROI + cerca (área mínima)
             elif class_id == self.stop_sign_class_id:
-                sx_bb = float(det.bbox.size_x)
-                sy_bb = float(det.bbox.size_y)
+                sx_bb = sx
+                sy_bb = sy
 
                 # 1) dentro del ROI
                 if not ((sx1 <= cx <= sx2) and (sy1 <= cy <= sy2)):
                     continue
 
                 # 2) cerca del auto: área mínima
-                area = float(sx_bb * sy_bb)
                 if area < self.stop_min_bbox_area:
                     continue
 
@@ -411,13 +471,8 @@ class DetectionFilterNode(Node):
 
             # TRAFFIC LIGHT
             elif class_id == self.traffic_light_class_id:
-                sx = float(det.bbox.size_x)
-                sy = float(det.bbox.size_y)
-
                 if not (tl_rx1 <= cx <= tl_rx2 and tl_ry1 <= cy <= tl_ry2):
                     continue
-
-                area = float(sx * sy)
                 if area < self.tl_min_bbox_area:
                     continue
 
@@ -445,6 +500,20 @@ class DetectionFilterNode(Node):
         self._publish_person(best_person, msg.header)
         self._publish_stop_sign(best_stop_sign, msg.header)
         self._publish_traffic_light_from_bbox(tl_best_bbox, tl_best_score, tl_roi_rect, msg.header)
+
+        if self.debug_image_enabled:
+            now = time.monotonic()
+            if (now - self._last_debug_pub_time) >= self.debug_publish_period:
+                self._publish_debug_image(
+                    img,
+                    msg.header,
+                    debug_entries,
+                    self.last_person_msg,
+                    self.last_tl_msg,
+                    self.last_stop_msg,
+                    self.last_zebra_msg,
+                )
+                self._last_debug_pub_time = now
 
         # Debug
         if self.tl_debug_view:
@@ -480,6 +549,7 @@ class DetectionFilterNode(Node):
         msg.detected = bool(self._person_publish_stable(detection_data is not None))
         msg.confidence = float(detection_data[1]) if (msg.detected and detection_data is not None) else 0.0
         self.person_pub.publish(msg)
+        self.last_person_msg = msg
 
     def _person_show_debug(self, img_bgr, roi_rect, bbox_rect, best_person):
         dbg = img_bgr.copy()
@@ -516,6 +586,7 @@ class DetectionFilterNode(Node):
         msg.detected = detection_data is not None
         msg.confidence = float(detection_data[1]) if detection_data is not None else 0.0
         self.stop_sign_pub.publish(msg)
+        self.last_stop_msg = msg
 
     def _stop_show_debug(self, img_bgr, roi_rect, bbox_rect, best_stop, best_stop_area):
         dbg = img_bgr.copy()
@@ -560,6 +631,7 @@ class DetectionFilterNode(Node):
             out.confidence = 0.0
             out.state = stable
             self.traffic_light_pub.publish(out)
+            self.last_tl_msg = out
             return
 
         x1, y1, x2, y2 = best_bbox
@@ -570,6 +642,7 @@ class DetectionFilterNode(Node):
             out.confidence = 0.0
             out.state = stable
             self.traffic_light_pub.publish(out)
+            self.last_tl_msg = out
             return
 
         state = self._tl_analyze_red_green(roi_tl)
@@ -579,6 +652,119 @@ class DetectionFilterNode(Node):
         out.confidence = float(best_score)
         out.state = stable
         self.traffic_light_pub.publish(out)
+        self.last_tl_msg = out
+
+    def _check_debug_filters(self, class_id, cx, cy, area, score, person_roi, stop_roi, tl_roi):
+        if score < self.min_confidence:
+            return False
+
+        if class_id == self.person_class_id:
+            rx1, ry1, rx2, ry2 = person_roi
+            return (rx1 <= cx <= rx2) and (ry1 <= cy <= ry2) and (area >= self.person_min_bbox_area)
+
+        if class_id == self.stop_sign_class_id:
+            rx1, ry1, rx2, ry2 = stop_roi
+            return (rx1 <= cx <= rx2) and (ry1 <= cy <= ry2) and (area >= self.stop_min_bbox_area)
+
+        if class_id == self.traffic_light_class_id:
+            rx1, ry1, rx2, ry2 = tl_roi
+            return (rx1 <= cx <= rx2) and (ry1 <= cy <= ry2) and (area >= self.tl_min_bbox_area)
+
+        return False
+
+    def _publish_debug_image(self, img_bgr, header, detections, p_state, tl_state, s_state, z_state):
+        if self.debug_image_pub is None:
+            return
+
+        canvas = img_bgr.copy()
+
+        for class_id, score, bbox, passes in detections:
+            x1, y1, x2, y2 = bbox
+            if passes:
+                if class_id == self.person_class_id:
+                    color = COLOR_PERSON
+                elif class_id == self.stop_sign_class_id:
+                    color = COLOR_STOP
+                else:
+                    color = COLOR_TL
+                thickness = 2
+            else:
+                color = COLOR_FAIL
+                thickness = 1
+
+            label = f'{self._class_names.get(class_id, class_id)} {score:.2f}'
+            cv2.rectangle(canvas, (x1, y1), (x2, y2), color, thickness)
+            (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+            cv2.rectangle(canvas, (x1, max(0, y1 - th - 6)), (x1 + tw + 4, y1), color, -1)
+            cv2.putText(canvas, label, (x1 + 2, max(th + 2, y1 - 4)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+
+        self._draw_state_panel(canvas, p_state, tl_state, s_state, z_state)
+
+        if (canvas.shape[1] != self.debug_output_width) or (canvas.shape[0] != self.debug_output_height):
+            canvas = cv2.resize(
+                canvas,
+                (self.debug_output_width, self.debug_output_height),
+                interpolation=cv2.INTER_AREA,
+            )
+
+        try:
+            out_msg = self.bridge.cv2_to_imgmsg(canvas, 'bgr8')
+            out_msg.header = header
+            self.debug_image_pub.publish(out_msg)
+        except Exception as e:
+            self.get_logger().error(f'Debug image publish error: {e}')
+
+    @staticmethod
+    def _draw_state_panel(canvas, p_state, tl_state, s_state, z_state):
+        h, _ = canvas.shape[:2]
+
+        lines = [
+            f'PERSON : {"YES" if p_state.detected else "no"}  ({p_state.confidence:.2f})',
+            f'TL     : {tl_state.state if tl_state.detected else "---"}  ({tl_state.confidence:.2f})',
+            f'STOP   : {"YES" if s_state.detected else "no"}  ({s_state.confidence:.2f})',
+            f'ZEBRA  : {"YES" if z_state.detected else "no"}  (stripes={z_state.stripe_count})',
+        ]
+
+        line_colors = [
+            COLOR_PERSON if p_state.detected else COLOR_FAIL,
+            DetectionFilterNode._tl_state_color(tl_state),
+            COLOR_STOP if s_state.detected else COLOR_FAIL,
+            COLOR_ZEBRA if z_state.detected else COLOR_FAIL,
+        ]
+
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        scale = 0.50
+        thick = 1
+        line_h = 20
+        pad = 6
+
+        panel_h = len(lines) * line_h + pad * 2
+        panel_w = 310
+        y0 = h - panel_h
+        x0 = 0
+
+        overlay = canvas.copy()
+        cv2.rectangle(overlay, (x0, y0), (x0 + panel_w, h), (0, 0, 0), -1)
+        cv2.addWeighted(overlay, 0.55, canvas, 0.45, 0, canvas)
+
+        for i, (line, color) in enumerate(zip(lines, line_colors)):
+            ty = y0 + pad + (i + 1) * line_h - 4
+            cv2.putText(canvas, line, (x0 + pad, ty),
+                        font, scale, color, thick, cv2.LINE_AA)
+
+    @staticmethod
+    def _tl_state_color(tl):
+        if not tl.detected:
+            return COLOR_FAIL
+        s = str(tl.state).upper()
+        if s == 'RED':
+            return (0, 0, 255)
+        if s == 'GREEN':
+            return (0, 255, 0)
+        if s == 'YELLOW':
+            return (0, 200, 255)
+        return COLOR_FAIL
 
     def _tl_publish_stable(self, raw_state: str) -> str:
         if raw_state == self.tl_candidate:
@@ -776,6 +962,7 @@ class DetectionFilterNode(Node):
         msg.detected = detected
         msg.stripe_count = stripe_count
         self.zebra_pub.publish(msg)
+        self.last_zebra_msg = msg
 
 
 def main(args=None):
