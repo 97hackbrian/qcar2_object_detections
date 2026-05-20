@@ -31,12 +31,12 @@ image_preprocessor_node:
     # ===================== CLAHE (Contrast Enhancement) =====================
     # CLAHE = Contrast Limited Adaptive Histogram Equalization
     # Improves contrast for better object detection, especially for bright objects
-    clahe_enabled: true
+    clahe_enabled: false
     clahe_clip_limit: 5.0      # Limit for contrast amplification (2.0-5.0 recommended, INCREASED for better contrast)
     clahe_tile_size: 15        # Size of tiles for local contrast (8, 16, 32 common)
     
     # Optional: Brightness adjustment after CLAHE
-    brightness_adjustment: -55.0  # Range: -50 to +50 (0 = no adjustment)
+    brightness_adjustment: -1.0  # Range: -50 to +50 (0 = no adjustment)
 
 detection_filter_node:
   ros__parameters:
