@@ -124,12 +124,26 @@ detection_filter_node:
 
     traffic_light_sensitivity: 2 # mejor dif entre rojo y verde
 
-    traffic_light_red_lower: [0, 160, 160]
-    traffic_light_red_upper: [10, 255, 255]
-    traffic_light_yellow_lower: [20, 30, 240]
-    traffic_light_yellow_upper: [25, 100, 255]
-    traffic_light_green_lower: [26, 140, 140]
-    traffic_light_green_upper: [150, 255, 205]
+    traffic_light_red_lower_h: 0
+    traffic_light_red_lower_s: 160
+    traffic_light_red_lower_v: 160
+    traffic_light_red_upper_h: 10
+    traffic_light_red_upper_s: 255
+    traffic_light_red_upper_v: 255
+
+    traffic_light_yellow_lower_h: 20
+    traffic_light_yellow_lower_s: 30
+    traffic_light_yellow_lower_v: 240
+    traffic_light_yellow_upper_h: 25
+    traffic_light_yellow_upper_s: 100
+    traffic_light_yellow_upper_v: 255
+
+    traffic_light_green_lower_h: 26
+    traffic_light_green_lower_s: 140
+    traffic_light_green_lower_v: 140
+    traffic_light_green_upper_h: 150
+    traffic_light_green_upper_s: 255
+    traffic_light_green_upper_v: 205
 
 # =============================================================================
 # Image Compressor Node

@@ -121,12 +121,26 @@ class DetectionFilterNode(Node):
         self.declare_parameter('traffic_light_debug_view', False)
         self.declare_parameter('traffic_light_sensitivity', 8)
 
-        self.declare_parameter('traffic_light_red_lower', [0, 160, 160])
-        self.declare_parameter('traffic_light_red_upper', [10, 255, 255])
-        self.declare_parameter('traffic_light_yellow_lower', [20, 30, 240])
-        self.declare_parameter('traffic_light_yellow_upper', [45, 160, 255])
-        self.declare_parameter('traffic_light_green_lower', [46, 140, 140])
-        self.declare_parameter('traffic_light_green_upper', [90, 255, 255])
+        self.declare_parameter('traffic_light_red_lower_h', 0)
+        self.declare_parameter('traffic_light_red_lower_s', 160)
+        self.declare_parameter('traffic_light_red_lower_v', 160)
+        self.declare_parameter('traffic_light_red_upper_h', 10)
+        self.declare_parameter('traffic_light_red_upper_s', 255)
+        self.declare_parameter('traffic_light_red_upper_v', 255)
+
+        self.declare_parameter('traffic_light_yellow_lower_h', 20)
+        self.declare_parameter('traffic_light_yellow_lower_s', 30)
+        self.declare_parameter('traffic_light_yellow_lower_v', 240)
+        self.declare_parameter('traffic_light_yellow_upper_h', 25)
+        self.declare_parameter('traffic_light_yellow_upper_s', 100)
+        self.declare_parameter('traffic_light_yellow_upper_v', 255)
+
+        self.declare_parameter('traffic_light_green_lower_h', 26)
+        self.declare_parameter('traffic_light_green_lower_s', 140)
+        self.declare_parameter('traffic_light_green_lower_v', 140)
+        self.declare_parameter('traffic_light_green_upper_h', 150)
+        self.declare_parameter('traffic_light_green_upper_s', 255)
+        self.declare_parameter('traffic_light_green_upper_v', 205)
 
         # =====================================================================
         # 5) PERSON PARAMETERS (con histeresis)
@@ -205,12 +219,28 @@ class DetectionFilterNode(Node):
         self.tl_debug_view = bool(self.get_parameter('traffic_light_debug_view').value)
         self.tl_sensitivity = int(self.get_parameter('traffic_light_sensitivity').value)
 
-        self.red_lower = np.array(self.get_parameter('traffic_light_red_lower').value)
-        self.red_upper = np.array(self.get_parameter('traffic_light_red_upper').value)
-        self.yellow_lower = np.array(self.get_parameter('traffic_light_yellow_lower').value)
-        self.yellow_upper = np.array(self.get_parameter('traffic_light_yellow_upper').value)
-        self.green_lower = np.array(self.get_parameter('traffic_light_green_lower').value)
-        self.green_upper = np.array(self.get_parameter('traffic_light_green_upper').value)
+        self.red_lower_h = int(self.get_parameter('traffic_light_red_lower_h').value)
+        self.red_lower_s = int(self.get_parameter('traffic_light_red_lower_s').value)
+        self.red_lower_v = int(self.get_parameter('traffic_light_red_lower_v').value)
+        self.red_upper_h = int(self.get_parameter('traffic_light_red_upper_h').value)
+        self.red_upper_s = int(self.get_parameter('traffic_light_red_upper_s').value)
+        self.red_upper_v = int(self.get_parameter('traffic_light_red_upper_v').value)
+
+        self.yellow_lower_h = int(self.get_parameter('traffic_light_yellow_lower_h').value)
+        self.yellow_lower_s = int(self.get_parameter('traffic_light_yellow_lower_s').value)
+        self.yellow_lower_v = int(self.get_parameter('traffic_light_yellow_lower_v').value)
+        self.yellow_upper_h = int(self.get_parameter('traffic_light_yellow_upper_h').value)
+        self.yellow_upper_s = int(self.get_parameter('traffic_light_yellow_upper_s').value)
+        self.yellow_upper_v = int(self.get_parameter('traffic_light_yellow_upper_v').value)
+
+        self.green_lower_h = int(self.get_parameter('traffic_light_green_lower_h').value)
+        self.green_lower_s = int(self.get_parameter('traffic_light_green_lower_s').value)
+        self.green_lower_v = int(self.get_parameter('traffic_light_green_lower_v').value)
+        self.green_upper_h = int(self.get_parameter('traffic_light_green_upper_h').value)
+        self.green_upper_s = int(self.get_parameter('traffic_light_green_upper_s').value)
+        self.green_upper_v = int(self.get_parameter('traffic_light_green_upper_v').value)
+
+        self._refresh_traffic_light_thresholds()
 
         # Person
         self.person_roi_x_min = float(self.get_parameter('person_roi_x_min').value)
@@ -771,6 +801,14 @@ class DetectionFilterNode(Node):
             return (0, 200, 255)
         return COLOR_FAIL
 
+    def _refresh_traffic_light_thresholds(self):
+        self.red_lower = np.array([self.red_lower_h, self.red_lower_s, self.red_lower_v], dtype=np.uint8)
+        self.red_upper = np.array([self.red_upper_h, self.red_upper_s, self.red_upper_v], dtype=np.uint8)
+        self.yellow_lower = np.array([self.yellow_lower_h, self.yellow_lower_s, self.yellow_lower_v], dtype=np.uint8)
+        self.yellow_upper = np.array([self.yellow_upper_h, self.yellow_upper_s, self.yellow_upper_v], dtype=np.uint8)
+        self.green_lower = np.array([self.green_lower_h, self.green_lower_s, self.green_lower_v], dtype=np.uint8)
+        self.green_upper = np.array([self.green_upper_h, self.green_upper_s, self.green_upper_v], dtype=np.uint8)
+
     def _tl_publish_stable(self, raw_state: str) -> str:
         if raw_state == self.tl_candidate:
             self.tl_candidate_count += 1
@@ -1110,18 +1148,62 @@ class DetectionFilterNode(Node):
                     self.tl_debug_view = bool(value)
                 elif name == 'traffic_light_sensitivity':
                     self.tl_sensitivity = int(value)
-                elif name == 'traffic_light_red_lower':
-                    self.red_lower = np.array(value)
-                elif name == 'traffic_light_red_upper':
-                    self.red_upper = np.array(value)
-                elif name == 'traffic_light_yellow_lower':
-                    self.yellow_lower = np.array(value)
-                elif name == 'traffic_light_yellow_upper':
-                    self.yellow_upper = np.array(value)
-                elif name == 'traffic_light_green_lower':
-                    self.green_lower = np.array(value)
-                elif name == 'traffic_light_green_upper':
-                    self.green_upper = np.array(value)
+                elif name == 'traffic_light_red_lower_h':
+                    self.red_lower_h = int(value)
+                    self._refresh_traffic_light_thresholds()
+                elif name == 'traffic_light_red_lower_s':
+                    self.red_lower_s = int(value)
+                    self._refresh_traffic_light_thresholds()
+                elif name == 'traffic_light_red_lower_v':
+                    self.red_lower_v = int(value)
+                    self._refresh_traffic_light_thresholds()
+                elif name == 'traffic_light_red_upper_h':
+                    self.red_upper_h = int(value)
+                    self._refresh_traffic_light_thresholds()
+                elif name == 'traffic_light_red_upper_s':
+                    self.red_upper_s = int(value)
+                    self._refresh_traffic_light_thresholds()
+                elif name == 'traffic_light_red_upper_v':
+                    self.red_upper_v = int(value)
+                    self._refresh_traffic_light_thresholds()
+
+                elif name == 'traffic_light_yellow_lower_h':
+                    self.yellow_lower_h = int(value)
+                    self._refresh_traffic_light_thresholds()
+                elif name == 'traffic_light_yellow_lower_s':
+                    self.yellow_lower_s = int(value)
+                    self._refresh_traffic_light_thresholds()
+                elif name == 'traffic_light_yellow_lower_v':
+                    self.yellow_lower_v = int(value)
+                    self._refresh_traffic_light_thresholds()
+                elif name == 'traffic_light_yellow_upper_h':
+                    self.yellow_upper_h = int(value)
+                    self._refresh_traffic_light_thresholds()
+                elif name == 'traffic_light_yellow_upper_s':
+                    self.yellow_upper_s = int(value)
+                    self._refresh_traffic_light_thresholds()
+                elif name == 'traffic_light_yellow_upper_v':
+                    self.yellow_upper_v = int(value)
+                    self._refresh_traffic_light_thresholds()
+
+                elif name == 'traffic_light_green_lower_h':
+                    self.green_lower_h = int(value)
+                    self._refresh_traffic_light_thresholds()
+                elif name == 'traffic_light_green_lower_s':
+                    self.green_lower_s = int(value)
+                    self._refresh_traffic_light_thresholds()
+                elif name == 'traffic_light_green_lower_v':
+                    self.green_lower_v = int(value)
+                    self._refresh_traffic_light_thresholds()
+                elif name == 'traffic_light_green_upper_h':
+                    self.green_upper_h = int(value)
+                    self._refresh_traffic_light_thresholds()
+                elif name == 'traffic_light_green_upper_s':
+                    self.green_upper_s = int(value)
+                    self._refresh_traffic_light_thresholds()
+                elif name == 'traffic_light_green_upper_v':
+                    self.green_upper_v = int(value)
+                    self._refresh_traffic_light_thresholds()
 
                 elif name == 'person_roi_x_min':
                     self.person_roi_x_min = float(value)
