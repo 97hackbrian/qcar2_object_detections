@@ -153,81 +153,122 @@ class ImagePreprocessorNode(Node):
     # ─── Parameter change callback ──────────────────────────────────────
 
     def _on_parameters_changed(self, params) -> SetParametersResult:
-        """
-        Callback for dynamic parameter reconfiguration.
-        
-        Called when parameters are changed via ros2 param set or rqt_gui.
-        Allows real-time adjustment of CLAHE settings without node restart.
-        
-        Args:
-            params: List of Parameter objects that changed
-            
-        Returns:
-            SetParametersResult indicating success/failure
-        """
+        """Handle dynamic parameter updates from rqt or ros2 param set."""
         success = True
         rebuild_gamma_lut = False
+        recreate_sub = False
+        recreate_pub = False
 
         for param in params:
             try:
-                if param.name == 'filters_enabled':
-                    self.filters_enabled = param.value
-                    self.get_logger().info(
-                        f'Filters: {"ENABLED" if self.filters_enabled else "DISABLED (resize-only)"}'
-                    )
+                name = param.name
+                value = param.value
 
-                elif param.name == 'clahe_enabled':
-                    self.clahe_enabled = param.value
+                if name == 'input_image_topic':
+                    self.input_topic = str(value)
+                    recreate_sub = True
+
+                elif name == 'output_image_topic':
+                    self.output_topic = str(value)
+                    recreate_pub = True
+
+                elif name == 'input_width':
+                    if int(value) <= 0:
+                        raise ValueError('input_width must be > 0')
+                    self.input_width = int(value)
+                    self._calculate_padding()
+
+                elif name == 'input_height':
+                    if int(value) <= 0:
+                        raise ValueError('input_height must be > 0')
+                    self.input_height = int(value)
+                    self._calculate_padding()
+
+                elif name == 'target_width':
+                    if int(value) <= 0:
+                        raise ValueError('target_width must be > 0')
+                    self.target_width = int(value)
+                    self._calculate_padding()
+
+                elif name == 'target_height':
+                    if int(value) <= 0:
+                        raise ValueError('target_height must be > 0')
+                    self.target_height = int(value)
+                    self._calculate_padding()
+
+                elif name == 'padding_color':
+                    self.padding_color = list(value)
+
+                elif name == 'input_encoding':
+                    self.input_encoding = str(value)
+
+                elif name == 'filters_enabled':
+                    self.filters_enabled = bool(value)
+                    self.get_logger().info(f'Filters: {"ENABLED" if self.filters_enabled else "DISABLED (resize-only)"}')
+
+                elif name == 'clahe_enabled':
+                    self.clahe_enabled = bool(value)
                     self._reinitialize_clahe()
                     self.get_logger().info(f'CLAHE: {"Enabled" if self.clahe_enabled else "Disabled"}')
-                    
-                elif param.name == 'clahe_clip_limit':
-                    if param.value < 1.0 or param.value > 8.0:
-                        self.get_logger().warning(f'clip_limit out of range [1.0, 8.0]: {param.value}')
+
+                elif name == 'clahe_clip_limit':
+                    if float(value) < 1.0 or float(value) > 8.0:
+                        self.get_logger().warning(f'clip_limit out of range [1.0, 8.0]: {value}')
                         success = False
                         continue
-                    self.clahe_clip_limit = param.value
+                    self.clahe_clip_limit = float(value)
                     self._reinitialize_clahe()
                     self.get_logger().info(f'CLAHE clip_limit: {self.clahe_clip_limit}')
-                    
-                elif param.name == 'clahe_tile_size':
-                    if param.value not in [4, 8, 16, 32, 64]:
-                        self.get_logger().warning(f'tile_size should be power of 2: {param.value}')
+
+                elif name == 'clahe_tile_size':
+                    if int(value) not in [4, 8, 16, 32, 64]:
+                        self.get_logger().warning(f'tile_size should be power of 2: {value}')
                         success = False
                         continue
-                    self.clahe_tile_size = param.value
+                    self.clahe_tile_size = int(value)
                     self._reinitialize_clahe()
                     self.get_logger().info(f'CLAHE tile_size: {self.clahe_tile_size}x{self.clahe_tile_size}')
-                    
-                elif param.name == 'brightness_adjustment':
-                    if param.value < -50.0 or param.value > 50.0:
-                        self.get_logger().warning(f'brightness_adjustment out of range [-50, 50]: {param.value}')
+
+                elif name == 'brightness_adjustment':
+                    if float(value) < -50.0 or float(value) > 50.0:
+                        self.get_logger().warning(f'brightness_adjustment out of range [-50, 50]: {value}')
                         success = False
                         continue
-                    self.brightness_adjustment = param.value
+                    self.brightness_adjustment = float(value)
                     rebuild_gamma_lut = True
                     self.get_logger().info(f'Brightness adjustment: {self.brightness_adjustment}')
-                    
-                elif param.name == 'gamma_correction':
-                    if param.value <= 0.0 or param.value > 5.0:
-                        self.get_logger().warning(f'gamma_correction out of range (0.0, 5.0]: {param.value}')
+
+                elif name == 'gamma_correction':
+                    if float(value) <= 0.0 or float(value) > 5.0:
+                        self.get_logger().warning(f'gamma_correction out of range (0.0, 5.0]: {value}')
                         success = False
                         continue
-                    self.gamma_correction = param.value
+                    self.gamma_correction = float(value)
                     rebuild_gamma_lut = True
                     self.get_logger().info(f'Gamma correction: {self.gamma_correction}')
-                    
-                elif param.name == 'sharpen_image':
-                    self.sharpen_image = param.value
+
+                elif name == 'sharpen_image':
+                    self.sharpen_image = bool(value)
                     self.get_logger().info(f'Sharpen image: {self.sharpen_image}')
-                    
+
             except Exception as e:
                 self.get_logger().error(f'Error updating parameter {param.name}: {e}')
                 success = False
 
-        # Rebuild fused LUT only once after all params are processed
         if rebuild_gamma_lut:
             self._build_gamma_brightness_lut()
+
+        if recreate_sub:
+            if getattr(self, 'subscription', None) is not None:
+                self.destroy_subscription(self.subscription)
+            self.subscription = self.create_subscription(Image, self.input_topic, self.image_callback, 10)
+            self.get_logger().info(f'Input topic updated: {self.input_topic}')
+
+        if recreate_pub:
+            if getattr(self, 'publisher', None) is not None:
+                self.destroy_publisher(self.publisher)
+            self.publisher = self.create_publisher(Image, self.output_topic, 10)
+            self.get_logger().info(f'Output topic updated: {self.output_topic}')
 
         return SetParametersResult(successful=success)
 

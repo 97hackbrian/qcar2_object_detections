@@ -24,6 +24,8 @@ from collections import deque
 import threading
 import time
 
+from rcl_interfaces.msg import SetParametersResult
+
 from qcar2_object_detections.msg import (
     PersonDetection,
     TrafficLightDetection,
@@ -262,6 +264,9 @@ class DetectionFilterNode(Node):
             self.traffic_light_class_id: 'traffic_light',
             self.stop_sign_class_id: 'stop_sign',
         }
+
+        self.add_on_set_parameters_callback(self._on_parameters_changed)
+        self.zebra_thread = None
 
         # =====================================================================
         # 9) SUBSCRIBERS
@@ -963,6 +968,209 @@ class DetectionFilterNode(Node):
         msg.stripe_count = stripe_count
         self.zebra_pub.publish(msg)
         self.last_zebra_msg = msg
+
+
+    def _on_parameters_changed(self, params) -> SetParametersResult:
+        success = True
+
+        for param in params:
+            try:
+                name = param.name
+                value = param.value
+
+                if name == 'image_topic':
+                    self.image_topic = str(value)
+                    if getattr(self, 'image_sub', None) is not None:
+                        self.destroy_subscription(self.image_sub)
+                    self.image_sub = self.create_subscription(Image, self.image_topic, self.image_callback, 10)
+
+                elif name == 'detections_input_topic':
+                    self.detections_topic = str(value)
+                    if getattr(self, 'detection_sub', None) is not None:
+                        self.destroy_subscription(self.detection_sub)
+                    self.detection_sub = self.create_subscription(Detection2DArray, self.detections_topic, self.detection_callback, 10)
+
+                elif name == 'zebra_image_topic':
+                    self.zebra_image_topic = str(value)
+                    if getattr(self, 'zebra_image_sub', None) is not None:
+                        self.destroy_subscription(self.zebra_image_sub)
+                        self.zebra_image_sub = None
+                    if self.zebra_enabled:
+                        self.zebra_image_sub = self.create_subscription(Image, self.zebra_image_topic, self.zebra_image_callback, 10)
+
+                elif name == 'person_output_topic':
+                    self.person_output_topic = str(value)
+                    if getattr(self, 'person_pub', None) is not None:
+                        self.destroy_publisher(self.person_pub)
+                    self.person_pub = self.create_publisher(PersonDetection, self.person_output_topic, 10)
+
+                elif name == 'traffic_light_output_topic':
+                    self.traffic_light_output_topic = str(value)
+                    if getattr(self, 'traffic_light_pub', None) is not None:
+                        self.destroy_publisher(self.traffic_light_pub)
+                    self.traffic_light_pub = self.create_publisher(TrafficLightDetection, self.traffic_light_output_topic, 10)
+
+                elif name == 'stop_sign_output_topic':
+                    self.stop_sign_output_topic = str(value)
+                    if getattr(self, 'stop_sign_pub', None) is not None:
+                        self.destroy_publisher(self.stop_sign_pub)
+                    self.stop_sign_pub = self.create_publisher(StopSignDetection, self.stop_sign_output_topic, 10)
+
+                elif name == 'zebra_output_topic':
+                    self.zebra_output_topic = str(value)
+                    if getattr(self, 'zebra_pub', None) is not None:
+                        self.destroy_publisher(self.zebra_pub)
+                    self.zebra_pub = self.create_publisher(ZebraCrossingDetection, self.zebra_output_topic, 10)
+
+                elif name == 'person_class_id':
+                    self.person_class_id = str(value)
+                    self._class_names = {
+                        self.person_class_id: 'person',
+                        self.traffic_light_class_id: 'traffic_light',
+                        self.stop_sign_class_id: 'stop_sign',
+                    }
+
+                elif name == 'traffic_light_class_id':
+                    self.traffic_light_class_id = str(value)
+                    self._class_names = {
+                        self.person_class_id: 'person',
+                        self.traffic_light_class_id: 'traffic_light',
+                        self.stop_sign_class_id: 'stop_sign',
+                    }
+
+                elif name == 'stop_sign_class_id':
+                    self.stop_sign_class_id = str(value)
+                    self._class_names = {
+                        self.person_class_id: 'person',
+                        self.traffic_light_class_id: 'traffic_light',
+                        self.stop_sign_class_id: 'stop_sign',
+                    }
+
+                elif name == 'min_confidence':
+                    self.min_confidence = float(value)
+
+                elif name == 'stop_sign_roi_x_min':
+                    self.stop_roi_x_min = float(value)
+                elif name == 'stop_sign_roi_x_max':
+                    self.stop_roi_x_max = float(value)
+                elif name == 'stop_sign_roi_y_min':
+                    self.stop_roi_y_min = float(value)
+                elif name == 'stop_sign_roi_y_max':
+                    self.stop_roi_y_max = float(value)
+                elif name == 'stop_sign_min_bbox_area':
+                    self.stop_min_bbox_area = float(value)
+                elif name == 'stop_sign_debug_view':
+                    self.stop_debug_view = bool(value)
+                elif name == 'stop_sign_window_name':
+                    self.stop_window_name = str(value)
+
+                elif name == 'zebra_enabled':
+                    self.zebra_enabled = bool(value)
+                    if getattr(self, 'zebra_image_sub', None) is not None:
+                        self.destroy_subscription(self.zebra_image_sub)
+                        self.zebra_image_sub = None
+                    if self.zebra_enabled:
+                        self.zebra_image_sub = self.create_subscription(Image, self.zebra_image_topic, self.zebra_image_callback, 10)
+                    if self.zebra_enabled and (self.zebra_thread is None or not self.zebra_thread.is_alive()):
+                        self.zebra_thread = threading.Thread(target=self._zebra_loop, daemon=True)
+                        self.zebra_thread.start()
+                elif name == 'zebra_roi_top':
+                    self.zebra_roi_top = float(value)
+                elif name == 'zebra_roi_bottom':
+                    self.zebra_roi_bottom = float(value)
+                elif name == 'zebra_roi_width':
+                    self.zebra_roi_width = float(value)
+                elif name == 'zebra_min_stripes':
+                    self.zebra_min_stripes = int(value)
+                elif name == 'zebra_max_stripes':
+                    self.zebra_max_stripes = int(value)
+                elif name == 'zebra_vote_threshold':
+                    self.zebra_vote_threshold = int(value)
+                elif name == 'zebra_vote_window':
+                    self.zebra_vote_window = int(value)
+                    self.zebra_votes = deque(maxlen=self.zebra_vote_window)
+                elif name == 'zebra_debug_view':
+                    self.zebra_debug_view = bool(value)
+                elif name == 'zebra_window_name':
+                    self.zebra_window_name = str(value)
+
+                elif name == 'traffic_light_roi_x_min':
+                    self.tl_roi_x_min = float(value)
+                elif name == 'traffic_light_roi_x_max':
+                    self.tl_roi_x_max = float(value)
+                elif name == 'traffic_light_roi_y_min':
+                    self.tl_roi_y_min = float(value)
+                elif name == 'traffic_light_roi_y_max':
+                    self.tl_roi_y_max = float(value)
+                elif name == 'traffic_light_min_bbox_area':
+                    self.tl_min_bbox_area = float(value)
+                elif name == 'traffic_light_confirm_frames':
+                    self.tl_confirm_frames = int(value)
+                elif name == 'traffic_light_debug_view':
+                    self.tl_debug_view = bool(value)
+                elif name == 'traffic_light_sensitivity':
+                    self.tl_sensitivity = int(value)
+                elif name == 'traffic_light_red_lower':
+                    self.red_lower = np.array(value)
+                elif name == 'traffic_light_red_upper':
+                    self.red_upper = np.array(value)
+                elif name == 'traffic_light_yellow_lower':
+                    self.yellow_lower = np.array(value)
+                elif name == 'traffic_light_yellow_upper':
+                    self.yellow_upper = np.array(value)
+                elif name == 'traffic_light_green_lower':
+                    self.green_lower = np.array(value)
+                elif name == 'traffic_light_green_upper':
+                    self.green_upper = np.array(value)
+
+                elif name == 'person_roi_x_min':
+                    self.person_roi_x_min = float(value)
+                elif name == 'person_roi_x_max':
+                    self.person_roi_x_max = float(value)
+                elif name == 'person_roi_y_min':
+                    self.person_roi_y_min = float(value)
+                elif name == 'person_roi_y_max':
+                    self.person_roi_y_max = float(value)
+                elif name == 'person_min_bbox_area':
+                    self.person_min_bbox_area = float(value)
+                elif name == 'person_confirm_frames_on':
+                    self.person_confirm_frames_on = int(value)
+                elif name == 'person_confirm_frames_off':
+                    self.person_confirm_frames_off = int(value)
+                elif name == 'person_debug_view':
+                    self.person_debug_view = bool(value)
+                elif name == 'person_window_name':
+                    self.person_window_name = str(value)
+
+                elif name == 'debug_image_enabled':
+                    self.debug_image_enabled = bool(value)
+                    if getattr(self, 'debug_image_pub', None) is not None:
+                        self.destroy_publisher(self.debug_image_pub)
+                        self.debug_image_pub = None
+                    if self.debug_image_enabled:
+                        self.debug_image_pub = self.create_publisher(Image, self.output_image_topic, 10)
+                elif name == 'output_image_topic':
+                    self.output_image_topic = str(value)
+                    if getattr(self, 'debug_image_pub', None) is not None:
+                        self.destroy_publisher(self.debug_image_pub)
+                        self.debug_image_pub = None
+                    if self.debug_image_enabled:
+                        self.debug_image_pub = self.create_publisher(Image, self.output_image_topic, 10)
+                elif name == 'debug_publish_hz':
+                    self.debug_publish_hz = float(value)
+                    if self.debug_publish_hz <= 0.0:
+                        self.debug_publish_hz = 5.0
+                    self.debug_publish_period = 1.0 / self.debug_publish_hz
+                elif name == 'debug_output_width':
+                    self.debug_output_width = int(value)
+                elif name == 'debug_output_height':
+                    self.debug_output_height = int(value)
+
+            except Exception as e:
+                self.get_logger().error(f'Error updating parameter {param.name}: {e}')
+                success = False
+
+        return SetParametersResult(successful=success)
 
 
 def main(args=None):

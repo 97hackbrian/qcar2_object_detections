@@ -94,9 +94,9 @@ detection_filter_node:
     # ===================== STOP SIGN (ROI en %) =====================
     stop_sign_roi_x_min: 0.85
     stop_sign_roi_x_max: 1.0
-    stop_sign_roi_y_min: 0.05
-    stop_sign_roi_y_max: 0.50
-    stop_sign_min_bbox_area: 50  # Minimum bounding box area to detect stop sign
+    stop_sign_roi_y_min: 0.2
+    stop_sign_roi_y_max: 0.45
+    stop_sign_min_bbox_area: 2000  # Minimum bounding box area to detect stop sign
 
     #Con estos valores el robot para muy antes
     #stop_sign_roi_x_min: 0.62
@@ -117,19 +117,19 @@ detection_filter_node:
     # ===================== TRAFFIC LIGHT =====================
     traffic_light_roi_x_min: 0.25
     traffic_light_roi_x_max: 0.75
-    traffic_light_roi_y_min: 0.1
-    traffic_light_roi_y_max: 0.85
-    traffic_light_min_bbox_area: 10
+    traffic_light_roi_y_min: 0.35
+    traffic_light_roi_y_max: 0.48
+    traffic_light_min_bbox_area: 300
     traffic_light_confirm_frames: 2
 
-    traffic_light_sensitivity: 4 # mejor dif entre rojo y verde
+    traffic_light_sensitivity: 2 # mejor dif entre rojo y verde
 
     traffic_light_red_lower: [0, 160, 160]
     traffic_light_red_upper: [10, 255, 255]
     traffic_light_yellow_lower: [20, 30, 240]
-    traffic_light_yellow_upper: [45, 160, 255]
-    traffic_light_green_lower: [46, 140, 140]
-    traffic_light_green_upper: [90, 255, 255]
+    traffic_light_yellow_upper: [25, 100, 255]
+    traffic_light_green_lower: [26, 140, 140]
+    traffic_light_green_upper: [150, 255, 205]
 
 # =============================================================================
 # Image Compressor Node
