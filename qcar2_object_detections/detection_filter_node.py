@@ -85,7 +85,7 @@ class DetectionFilterNode(Node):
         self.declare_parameter('stop_sign_roi_y_max', 0.75)
 
         # Cerca del auto
-        self.declare_parameter('stop_sign_min_bbox_area', 100) #2500
+        self.declare_parameter('stop_sign_min_bbox_area', 50) #2500
 
         self.declare_parameter('stop_sign_debug_view', False)
         self.declare_parameter('stop_sign_window_name', 'stop_debug')
