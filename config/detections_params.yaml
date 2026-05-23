@@ -92,11 +92,11 @@ detection_filter_node:
     person_confirm_frames_off: 8
 
     # ===================== STOP SIGN (ROI en %) =====================
-    stop_sign_roi_x_min: 0.79
+    stop_sign_roi_x_min: 0.78
     stop_sign_roi_x_max: 1.0
     stop_sign_roi_y_min: 0.2
     stop_sign_roi_y_max: 0.45
-    stop_sign_min_bbox_area: 2000  # Minimum bounding box area to detect stop sign
+    stop_sign_min_bbox_area: 1500  # Minimum bounding box area to detect stop sign
 
     #Con estos valores el robot para muy antes
     #stop_sign_roi_x_min: 0.62
@@ -115,10 +115,10 @@ detection_filter_node:
     zebra_vote_window: 8
 
     # ===================== TRAFFIC LIGHT =====================
-    traffic_light_roi_x_min: 0.25
-    traffic_light_roi_x_max: 0.75
-    traffic_light_roi_y_min: 0.35
-    traffic_light_roi_y_max: 0.48
+    traffic_light_roi_x_min: 0.2
+    traffic_light_roi_x_max: 0.8
+    traffic_light_roi_y_min: 0.34
+    traffic_light_roi_y_max: 0.49
     traffic_light_min_bbox_area: 300
     traffic_light_confirm_frames: 2
 
@@ -127,18 +127,18 @@ detection_filter_node:
     traffic_light_red_lower_h: 0
     traffic_light_red_lower_s: 160
     traffic_light_red_lower_v: 160
-    traffic_light_red_upper_h: 10
+    traffic_light_red_upper_h: 5
     traffic_light_red_upper_s: 255
     traffic_light_red_upper_v: 255
 
-    traffic_light_yellow_lower_h: 20
+    traffic_light_yellow_lower_h: 12
     traffic_light_yellow_lower_s: 30
     traffic_light_yellow_lower_v: 240
-    traffic_light_yellow_upper_h: 25
+    traffic_light_yellow_upper_h: 20
     traffic_light_yellow_upper_s: 100
     traffic_light_yellow_upper_v: 255
 
-    traffic_light_green_lower_h: 26
+    traffic_light_green_lower_h: 22
     traffic_light_green_lower_s: 140
     traffic_light_green_lower_v: 140
     traffic_light_green_upper_h: 150
